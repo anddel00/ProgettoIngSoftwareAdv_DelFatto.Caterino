@@ -1,4 +1,4 @@
-package ricette.progettoingsoftwareadvdelfattocaterino;
+package wms.progettoingsoftwareadvdelfattocaterino;
 
 import java.io.*;
 
