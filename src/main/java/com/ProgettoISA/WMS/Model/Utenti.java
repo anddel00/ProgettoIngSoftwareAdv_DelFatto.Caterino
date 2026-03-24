@@ -21,10 +21,10 @@ public class Utenti {
     @JoinColumn(name = "Id.Ruolo") 
     private Ruoli ruolo;
 
-    @OneToMany(mappedBy = "turni_dipendente")
+    @OneToMany(mappedBy = "dipendente")
     private List<TurniDip> turniDip;    
 
-    @OneToMany(mappedBy = "task_dipendente")
+    @OneToMany(mappedBy = "dipendente")
     private List<TaskDip> taskDip;
 
 
