@@ -27,7 +27,9 @@ public class Scaffali {
     @OneToMany(mappedBy = "scaffale")
     private List<Mappa> mappa_scaffali;
 
-    
+    public Scaffali() {
+    }
+
     public Scaffali(int max_righe, int max_colonne, int max_altezza, int max_peso) {
         this.max_righe = max_righe;
         this.max_colonne = max_colonne;
@@ -38,18 +40,57 @@ public class Scaffali {
     public long getId() {
         return id;
     }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
     public int getMax_righe() {
         return max_righe;
     }
+
+    public void setMax_righe(int max_righe) {
+        this.max_righe = max_righe;
+    }
+
     public int getMax_colonne() {
         return max_colonne;
     }
+
+    public void setMax_colonne(int max_colonne) {
+        this.max_colonne = max_colonne;
+    }
+
     public int getMax_altezza() {
         return max_altezza;
     }
+
+    public void setMax_altezza(int max_altezza) {
+        this.max_altezza = max_altezza;
+    }
+
     public int getMax_peso() {
         return max_peso;
     }
-    
+
+    public void setMax_peso(int max_peso) {
+        this.max_peso = max_peso;
+    }
+
+    public List<Task> getTask_scaffali_inizio() {
+        return task_scaffali_inizio;
+    }
+
+    public List<Task> getTask_scaffali_fine() {
+        return task_scaffali_fine;
+    }
+
+    public List<BatchScaffale> getBatch_scaffali() {
+        return batch_scaffali;
+    }
+
+    public List<Mappa> getMappa_scaffali() {
+        return mappa_scaffali;
+    }
 
 }

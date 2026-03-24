@@ -31,11 +31,23 @@ public class TurniDip {
         return id;
     }
 
+    public void setId(Long id) {
+        this.id = id;
+    }
+
     public Utenti getDipendente() {
         return dipendente;
     }
 
+    public void setDipendente(Utenti dipendente) {
+        this.dipendente = dipendente;
+    }
+
     public Turni getTurno() {
         return turno;
+    }
+
+    public void setTurno(Turni turno) {
+        this.turno = turno;
     }
 }

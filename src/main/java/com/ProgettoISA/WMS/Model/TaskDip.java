@@ -17,7 +17,9 @@ public class TaskDip {
     @JoinColumn(name = "Id.Task")
     private Task task;
 
-    
+    public TaskDip() {
+    }
+
     public TaskDip(Utenti dipendente, Task task) {
         this.dipendente = dipendente;
         this.task = task;
@@ -27,12 +29,24 @@ public class TaskDip {
         return id;
     }
 
+    public void setId(Long id) {
+        this.id = id;
+    }
+
     public Utenti getDipendente() {
         return dipendente;
+    }
+
+    public void setDipendente(Utenti dipendente) {
+        this.dipendente = dipendente;
     }
 
     public Task getTask() {
         return task;
     }
-    
+
+    public void setTask(Task task) {
+        this.task = task;
+    }
+
 }

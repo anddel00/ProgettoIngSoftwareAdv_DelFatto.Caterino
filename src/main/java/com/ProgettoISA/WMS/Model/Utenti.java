@@ -27,6 +27,7 @@ public class Utenti {
     @OneToMany(mappedBy = "dipendente")
     private List<TaskDip> taskDip;
 
+    public Utenti() {}
 
     public Utenti(String nome, String cognome, Date data_nascita, String email, String password, Ruoli ruolo) {
         this.nome = nome;
@@ -64,5 +65,39 @@ public class Utenti {
     public Ruoli getId_ruolo() {
         return ruolo;
     }
+
+    public void setRuolo(Ruoli ruolo) {
+        this.ruolo = ruolo;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public void setData_nascita(Date data_nascita) {
+        this.data_nascita = data_nascita;
+    }
+
+    public void setCognome(String cognome) {
+        this.cognome = cognome;
+    }
+
+    public void setNome(String nome) {
+        this.nome = nome;
+    }
+
+    public List<TurniDip> getTurniDip() {
+        return turniDip;
+    }
+
+    public List<TaskDip> getTaskDip() {
+        return taskDip;
+    }
+
+
 
 }

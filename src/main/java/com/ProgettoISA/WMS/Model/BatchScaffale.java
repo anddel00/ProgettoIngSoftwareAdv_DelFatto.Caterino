@@ -30,12 +30,40 @@ public class BatchScaffale {
     @Column(name = "\"Qta\"", nullable = false)
     private Integer qta;
 
+    public BatchScaffale() {
+    }
+
+    public BatchScaffale(Scaffali scaffale, BatchProdotti batch_prodotti, Integer colonna, Integer riga, Integer altezza, Integer qta) {
+        this.scaffale = scaffale;
+        this.batch_prodotti = batch_prodotti;
+        this.colonna = colonna;
+        this.riga = riga;
+        this.altezza = altezza;
+        this.qta = qta;
+    }
+
     public Integer getId() {
         return id;
     }
 
     public void setId(Integer id) {
         this.id = id;
+    }
+
+    public Scaffali getScaffale() {
+        return scaffale;
+    }
+
+    public void setScaffale(Scaffali scaffale) {
+        this.scaffale = scaffale;
+    }
+
+    public BatchProdotti getBatch_prodotti() {
+        return batch_prodotti;
+    }
+
+    public void setBatch_prodotti(BatchProdotti batch_prodotti) {
+        this.batch_prodotti = batch_prodotti;
     }
 
     public Integer getColonna() {

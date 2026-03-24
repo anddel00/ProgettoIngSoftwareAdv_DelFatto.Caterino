@@ -7,6 +7,7 @@ import java.util.List;
 
 @Entity
 @Table(name = "\"BATCHPRODOTTI\"")
+
 public class BatchProdotti {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -28,6 +29,13 @@ public class BatchProdotti {
 
     @Column(name = "\"Scadenza\"", nullable = false)
     private LocalDate scadenza;
+
+    public BatchProdotti() {}
+    public BatchProdotti(Prodotti prodotto, Integer qta, LocalDate scadenza) {
+        this.prodotto = prodotto;
+        this.qta = qta;
+        this.scadenza = scadenza;
+    }
 
     public Integer getId() {
         return id;
@@ -60,5 +68,14 @@ public class BatchProdotti {
     public void setScadenza(LocalDate scadenza) {
         this.scadenza = scadenza;
     }
+
+    public List<BatchScaffale> getBatch_scaffali() {
+        return batch_scaffali;
+    }
+
+    public List<Task> getTask() {
+        return task;
+    }
+
 
 }

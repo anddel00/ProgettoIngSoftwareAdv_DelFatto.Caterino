@@ -16,7 +16,9 @@ public class Turni {
 
     @OneToMany(mappedBy = "turno")
     private List<TurniDip> turniDip;
-    
+
+    public Turni() {
+    }
 
     public Turni(String nome_turno, String orario_inizio, String orario_fine) {
         this.nome_turno = nome_turno;
@@ -28,15 +30,35 @@ public class Turni {
         return id;
     }
 
+    public void setId(Long id) {
+        this.id = id;
+    }
+
     public String getNome_turno() {
         return nome_turno;
+    }
+
+    public void setNome_turno(String nome_turno) {
+        this.nome_turno = nome_turno;
     }
 
     public String getOrario_inizio() {
         return orario_inizio;
     }
 
+    public void setOrario_inizio(String orario_inizio) {
+        this.orario_inizio = orario_inizio;
+    }
+
     public String getOrario_fine() {
         return orario_fine;
+    }
+
+    public void setOrario_fine(String orario_fine) {
+        this.orario_fine = orario_fine;
+    }
+
+    public List<TurniDip> getTurniDip() {
+        return turniDip;
     }
 }

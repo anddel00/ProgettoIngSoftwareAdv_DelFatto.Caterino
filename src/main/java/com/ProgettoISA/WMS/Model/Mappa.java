@@ -24,6 +24,16 @@ public class Mappa {
     @Column(name = "\"Y\"", nullable = false)
     private Integer y;
 
+    public Mappa() {
+    }
+
+    public Mappa(Reparti reparto, Scaffali scaffale, Integer x, Integer y) {
+        this.reparto = reparto;
+        this.scaffale = scaffale;
+        this.x = x;
+        this.y = y;
+    }
+
     public Integer getId() {
         return id;
     }
@@ -38,6 +48,14 @@ public class Mappa {
 
     public void setReparto(Reparti reparto) {
         this.reparto = reparto;
+    }
+
+    public Scaffali getScaffale() {
+        return scaffale;
+    }
+
+    public void setScaffale(Scaffali scaffale) {
+        this.scaffale = scaffale;
     }
 
     public Integer getX() {

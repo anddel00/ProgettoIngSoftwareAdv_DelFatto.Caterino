@@ -19,6 +19,14 @@ public class EtProd {
     @JoinColumn(name = "\"Id.Etichetta\"", nullable = false)
     private Etichette etichetta;
 
+    public EtProd() {
+    }
+
+    public EtProd(Prodotti prodotto, Etichette etichetta) {
+        this.prodotto = prodotto;
+        this.etichetta = etichetta;
+    }
+
     public Integer getId() {
         return id;
     }

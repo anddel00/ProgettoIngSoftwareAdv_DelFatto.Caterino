@@ -16,6 +16,13 @@ public class Etichette {
     @OneToMany(mappedBy = "etichetta")
     private java.util.List<EtProd> etProd;
 
+    public Etichette() {
+    }
+
+    public Etichette(String nome) {
+        this.nome = nome;
+    }
+
     public Integer getId() {
         return id;
     }
@@ -30,6 +37,10 @@ public class Etichette {
 
     public void setNome(String nome) {
         this.nome = nome;
+    }
+
+    public java.util.List<EtProd> getEtProd() {
+        return etProd;
     }
 
 }

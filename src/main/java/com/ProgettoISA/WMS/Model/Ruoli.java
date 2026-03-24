@@ -14,4 +14,31 @@ public class Ruoli {
 
     @OneToMany(mappedBy = "ruolo")
     private List<Utenti> lista_ruolo_utenti;
+
+    public Ruoli() {
+    }
+
+    public Ruoli(String nome_ruolo) {
+        this.nome_ruolo = nome_ruolo;
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getNome_ruolo() {
+        return nome_ruolo;
+    }
+
+    public void setNome_ruolo(String nome_ruolo) {
+        this.nome_ruolo = nome_ruolo;
+    }
+
+    public List<Utenti> getLista_ruolo_utenti() {
+        return lista_ruolo_utenti;
+    }
 }

@@ -35,6 +35,8 @@ public class Task {
     @OneToMany(mappedBy = "task")
     private List<TaskDip> taskDip;
 
+    public Task() {
+    }
 
     public Task(String descrizione, String tipo_task, BatchProdotti batch_prodotti, Scaffali scaffale_inizio, Scaffali scaffale_fine, int vecchia_x, int vecchia_y, int nuova_x, int nuova_y, String stato_task, int qta_spostata) {
         this.descrizione = descrizione;
@@ -53,37 +55,100 @@ public class Task {
     public long getId() {
         return id;
     }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
     public String getDescrizione() {
         return descrizione;
     }
+
+    public void setDescrizione(String descrizione) {
+        this.descrizione = descrizione;
+    }
+
     public String getTipo_task() {
         return tipo_task;
     }
+
+    public void setTipo_task(String tipo_task) {
+        this.tipo_task = tipo_task;
+    }
+
     public BatchProdotti getBatch_prodotti() {
         return batch_prodotti;
     }
+
+    public void setBatch_prodotti(BatchProdotti batch_prodotti) {
+        this.batch_prodotti = batch_prodotti;
+    }
+
     public Scaffali getScaffale_inizio() {
         return scaffale_inizio;
     }
+
+    public void setScaffale_inizio(Scaffali scaffale_inizio) {
+        this.scaffale_inizio = scaffale_inizio;
+    }
+
     public Scaffali getScaffale_fine() {
         return scaffale_fine;
     }
+
+    public void setScaffale_fine(Scaffali scaffale_fine) {
+        this.scaffale_fine = scaffale_fine;
+    }
+
     public int getVecchia_x() {
         return vecchia_x;
     }
+
+    public void setVecchia_x(int vecchia_x) {
+        this.vecchia_x = vecchia_x;
+    }
+
     public int getVecchia_y() {
         return vecchia_y;
     }
+
+    public void setVecchia_y(int vecchia_y) {
+        this.vecchia_y = vecchia_y;
+    }
+
     public int getNuova_x() {
         return nuova_x;
     }
+
+    public void setNuova_x(int nuova_x) {
+        this.nuova_x = nuova_x;
+    }
+
     public int getNuova_y() {
         return nuova_y;
     }
+
+    public void setNuova_y(int nuova_y) {
+        this.nuova_y = nuova_y;
+    }
+
     public String getStato_task() {
         return stato_task;
     }
+
+    public void setStato_task(String stato_task) {
+        this.stato_task = stato_task;
+    }
+
     public int getQta_spostata() {
         return qta_spostata;
+    }
+
+    public void setQta_spostata(int qta_spostata) {
+        this.qta_spostata = qta_spostata;
+    }
+
+    public List<TaskDip> getTaskDip() {
+        return taskDip;
     }
 }
