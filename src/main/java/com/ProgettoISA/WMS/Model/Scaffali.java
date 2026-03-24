@@ -1,5 +1,6 @@
 package com.ProgettoISA.WMS.Model;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import jakarta.persistence.*;
@@ -16,16 +17,16 @@ public class Scaffali {
     private int max_peso;
 
     @OneToMany(mappedBy = "scaffale_inizio")
-    private List<Task> task_scaffali_inizio;
+    private List<Task> task_scaffali_inizio = new ArrayList<>();
 
     @OneToMany(mappedBy = "scaffale_fine")
-    private List<Task> task_scaffali_fine;
+    private List<Task> task_scaffali_fine = new ArrayList<>();
 
     @OneToMany(mappedBy = "scaffale")
-    private List<BatchScaffale> batch_scaffali;
+    private List<BatchScaffale> batch_scaffali = new ArrayList<>();
 
     @OneToMany(mappedBy = "scaffale")
-    private List<Mappa> mappa_scaffali;
+    private List<Mappa> mappa_scaffali = new ArrayList<>();
 
     public Scaffali() {
     }
@@ -37,7 +38,7 @@ public class Scaffali {
         this.max_peso = max_peso;
     }
 
-    public long getId() {
+    public Long getId() {
         return id;
     }
 

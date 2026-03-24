@@ -1,5 +1,6 @@
 package com.ProgettoISA.WMS.Model;
 
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
@@ -22,10 +23,10 @@ public class Utenti {
     private Ruoli ruolo;
 
     @OneToMany(mappedBy = "dipendente")
-    private List<TurniDip> turniDip;    
+    private List<TurniDip> turniDip = new ArrayList<>();
 
     @OneToMany(mappedBy = "dipendente")
-    private List<TaskDip> taskDip;
+    private List<TaskDip> taskDip = new ArrayList<>();
 
     public Utenti() {}
 

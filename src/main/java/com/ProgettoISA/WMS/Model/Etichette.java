@@ -2,6 +2,9 @@ package com.ProgettoISA.WMS.Model;
 
 import jakarta.persistence.*;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Entity
 @Table(name = "\"ETICHETTE\"")
 public class Etichette {
@@ -14,7 +17,7 @@ public class Etichette {
     private String nome;
 
     @OneToMany(mappedBy = "etichetta")
-    private java.util.List<EtProd> etProd;
+    private List<EtProd> etProd = new ArrayList<>();
 
     public Etichette() {
     }

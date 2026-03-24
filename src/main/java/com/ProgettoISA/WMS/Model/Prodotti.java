@@ -2,6 +2,8 @@ package com.ProgettoISA.WMS.Model;
 
 import jakarta.persistence.*;
 
+import java.util.ArrayList;
+
 @Entity
 @Table(name = "PRODOTTI")
 public class Prodotti {
@@ -15,10 +17,10 @@ public class Prodotti {
     private Long MaxTemperatura;
 
     @OneToMany(mappedBy="prodotto")
-    private java.util.List<BatchProdotti> BatchProdotti;
+    private java.util.List<BatchProdotti> BatchProdotti = new ArrayList<>();
 
     @OneToMany(mappedBy="prodotto")
-    private java.util.List<EtProd> EtProd;
+    private java.util.List<EtProd> EtProd = new ArrayList<>();
 
     public Prodotti() {
     }

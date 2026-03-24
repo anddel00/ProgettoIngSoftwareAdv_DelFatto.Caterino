@@ -2,6 +2,7 @@ package com.ProgettoISA.WMS.Model;
 
 import jakarta.persistence.Entity;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import jakarta.persistence.*;
@@ -18,7 +19,7 @@ public class Reparti {
     private Long Temperature;
 
     @OneToMany(mappedBy = "reparto")
-    private List<Mappa> mappe;
+    private List<Mappa> mappe = new ArrayList<>();
 
     public Reparti() {
     }

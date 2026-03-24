@@ -3,6 +3,7 @@ package com.ProgettoISA.WMS.Model;
 import jakarta.persistence.*;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
@@ -19,10 +20,10 @@ public class BatchProdotti {
     private Prodotti prodotto;
 
     @OneToMany(mappedBy="batch_prodotti")
-    private List<BatchScaffale> batch_scaffali;
+    private List<BatchScaffale> batch_scaffali = new ArrayList<>();
 
     @OneToMany(mappedBy="batch_prodotti")
-    private List<Task> task;
+    private List<Task> task = new ArrayList<>();
 
     @Column(name = "\"Qta\"", nullable = false)
     private Integer qta;

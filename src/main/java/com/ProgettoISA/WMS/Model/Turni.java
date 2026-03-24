@@ -15,7 +15,7 @@ public class Turni {
     private String orario_fine;
 
     @OneToMany(mappedBy = "turno")
-    private List<TurniDip> turniDip;
+    private List<TurniDip> turniDip = new java.util.ArrayList<>();
 
     public Turni() {
     }

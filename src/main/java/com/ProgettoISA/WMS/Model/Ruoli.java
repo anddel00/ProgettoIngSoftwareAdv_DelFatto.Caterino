@@ -1,5 +1,6 @@
 package com.ProgettoISA.WMS.Model;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import jakarta.persistence.*;
@@ -13,7 +14,7 @@ public class Ruoli {
     private String nome_ruolo;
 
     @OneToMany(mappedBy = "ruolo")
-    private List<Utenti> lista_ruolo_utenti;
+    private List<Utenti> lista_ruolo_utenti = new ArrayList<>();
 
     public Ruoli() {
     }

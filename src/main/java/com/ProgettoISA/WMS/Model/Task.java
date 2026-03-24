@@ -1,5 +1,6 @@
 package com.ProgettoISA.WMS.Model;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import jakarta.persistence.*;
@@ -33,7 +34,7 @@ public class Task {
     private int qta_spostata;
 
     @OneToMany(mappedBy = "task")
-    private List<TaskDip> taskDip;
+    private List<TaskDip> taskDip = new ArrayList<>();
 
     public Task() {
     }
