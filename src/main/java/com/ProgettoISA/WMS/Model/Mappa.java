@@ -14,6 +14,10 @@ public class Mappa {
     @JoinColumn(name = "\"Id.Reparto\"", nullable = false)
     private Reparti reparto;
 
+    @ManyToOne
+    @JoinColumn(name = "\"Id.Scaffale\"", nullable = false)
+    private Scaffali scaffale;
+
     @Column(name = "\"X\"", nullable = false)
     private Integer x;
 

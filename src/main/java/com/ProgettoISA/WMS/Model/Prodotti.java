@@ -14,6 +14,12 @@ public class Prodotti {
     private Long MinTemperatura;
     private Long MaxTemperatura;
 
+    @OneToMany(mappedBy="prodotto")
+    private java.util.List<BatchProdotti> BatchProdotti;
+    
+    @OneToMany(mappedBy="prodotto")
+    private java.util.List<EtProd> EtProd;
+
     public Prodotti(String nome, Long SpazioUnitario, Float Prezzo, Long MinTemperatura, Long MaxTemperatura) {
         this.nome = nome;
         this.SpazioUnitario = SpazioUnitario;

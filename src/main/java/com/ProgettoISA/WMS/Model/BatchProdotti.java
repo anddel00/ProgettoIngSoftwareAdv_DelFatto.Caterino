@@ -3,6 +3,7 @@ package com.ProgettoISA.WMS.Model;
 import jakarta.persistence.*;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Entity
 @Table(name = "\"BATCHPRODOTTI\"")
@@ -15,6 +16,12 @@ public class BatchProdotti {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "\"Id.Prodotto\"", nullable = false)
     private Prodotti prodotto;
+
+    @OneToMany(mappedBy="batch_prodotti")
+    private List<BatchScaffale> batch_scaffali;
+
+    @OneToMany(mappedBy="batch_prodotti")
+    private List<Task> task;
 
     @Column(name = "\"Qta\"", nullable = false)
     private Integer qta;

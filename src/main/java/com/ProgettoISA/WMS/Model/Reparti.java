@@ -1,6 +1,9 @@
 package com.ProgettoISA.WMS.Model;
 
 import jakarta.persistence.Entity;
+
+import java.util.List;
+
 import jakarta.persistence.*;
 import jakarta.persistence.Table;
 
@@ -13,6 +16,9 @@ public class Reparti {
     private Long MaxX;
     private Long MaxY;
     private Long Temperature;
+
+    @OneToMany(mappedBy = "reparto")
+    private List<Mappa> mappe;
 
     public Reparti(Long id, Long MaxX, Long MaxY, Long Temperature) {
         this.id = id;

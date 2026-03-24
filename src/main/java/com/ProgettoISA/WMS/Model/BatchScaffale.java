@@ -10,6 +10,14 @@ public class BatchScaffale {
     @Column(name = "\"Id\"", nullable = false)
     private Integer id;
 
+    @ManyToOne
+    @JoinColumn(name = "\"Id.Scaffale\"", nullable = false)
+    private Scaffali scaffale;
+
+    @ManyToOne
+    @JoinColumn(name = "\"Id.Batch\"", nullable = false)
+    private BatchProdotti batch_prodotti;
+
     @Column(name = "\"Colonna\"", nullable = false)
     private Integer colonna;
 

@@ -13,6 +13,9 @@ public class Etichette {
     @Column(name = "\"Nome\"", nullable = false, length = 32)
     private String nome;
 
+    @OneToMany(mappedBy = "etichetta")
+    private java.util.List<EtProd> etProd;
+
     public Integer getId() {
         return id;
     }
