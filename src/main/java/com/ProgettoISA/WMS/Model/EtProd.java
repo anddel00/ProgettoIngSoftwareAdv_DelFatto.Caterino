@@ -2,11 +2,10 @@ package com.ProgettoISA.WMS.Model;
 
 import jakarta.persistence.*;
 
-import java.time.LocalDate;
-
 @Entity
-@Table(name = "\"BATCHPRODOTTI\"")
-public class Batchprodotti {
+@Table(name = "\"ETPROD\"")
+public class EtProd {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "\"Id\"", nullable = false)
@@ -16,11 +15,9 @@ public class Batchprodotti {
     @JoinColumn(name = "\"Id.Prodotto\"", nullable = false)
     private Prodotti prodotto;
 
-    @Column(name = "\"Qta\"", nullable = false)
-    private Integer qta;
-
-    @Column(name = "\"Scadenza\"", nullable = false)
-    private LocalDate scadenza;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "\"Id.Etichetta\"", nullable = false)
+    private Etichette etichetta;
 
     public Integer getId() {
         return id;
@@ -38,20 +35,11 @@ public class Batchprodotti {
         this.prodotto = prodotto;
     }
 
-    public Integer getQta() {
-        return qta;
+    public Etichette getEtichetta() {
+        return etichetta;
     }
 
-    public void setQta(Integer qta) {
-        this.qta = qta;
+    public void setEtichetta(Etichette etichetta) {
+        this.etichetta = etichetta;
     }
-
-    public LocalDate getScadenza() {
-        return scadenza;
-    }
-
-    public void setScadenza(LocalDate scadenza) {
-        this.scadenza = scadenza;
-    }
-
 }

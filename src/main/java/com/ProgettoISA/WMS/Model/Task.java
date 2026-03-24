@@ -1,5 +1,7 @@
 package com.ProgettoISA.WMS.Model;
 
+import java.util.List;
+
 import jakarta.persistence.*;
 
 @Entity

@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 
 @Entity
 @Table(name = "\"BATCHSCAFFALE\"")
-public class Batchscaffale {
+public class BatchScaffale {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "\"Id\"", nullable = false)
