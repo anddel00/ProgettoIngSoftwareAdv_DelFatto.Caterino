@@ -1,6 +1,7 @@
 package com.ProgettoISA.WMS.Model;
 
 import java.util.Date;
+import java.util.List;
 
 import jakarta.persistence.*;
 
@@ -15,17 +16,25 @@ public class Utenti {
     private Date data_nascita;
     private String email;
     private String password;
-    @ManyToOne
-    @JoinColumn(name = "id_ruolo") 
-    private int id_ruolo; 
 
-    public Utenti(String nome, String cognome, Date data_nascita, String email, String password, int id_ruolo) {
+    @ManyToOne
+    @JoinColumn(name = "Id.Ruolo") 
+    private Ruoli ruolo;
+
+    @OneToMany(mappedBy = "turni_dipendente")
+    private List<TurniDip> turniDip;    
+
+    @OneToMany(mappedBy = "task_dipendente")
+    private List<TaskDip> taskDip;
+
+
+    public Utenti(String nome, String cognome, Date data_nascita, String email, String password, Ruoli ruolo) {
         this.nome = nome;
         this.cognome = cognome;
         this.data_nascita = data_nascita;
         this.email = email;
         this.password = password;
-        this.id_ruolo = id_ruolo;
+        this.ruolo = ruolo;
     }
 
     public long getId() {
@@ -52,8 +61,8 @@ public class Utenti {
         return password;
     }
 
-    public int getId_ruolo() {
-        return id_ruolo;
+    public Ruoli getId_ruolo() {
+        return ruolo;
     }
 
 }
