@@ -63,7 +63,7 @@ public class Utenti {
         return password;
     }
 
-    public Ruoli getId_ruolo() {
+    public Ruoli getRuolo() { //era ancora getId_ruolo -> cambiato in getRuolo
         return ruolo;
     }
 
