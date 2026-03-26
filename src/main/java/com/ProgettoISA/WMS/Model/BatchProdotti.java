@@ -3,10 +3,13 @@ package com.ProgettoISA.WMS.Model;
 import jakarta.persistence.*;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "\"BATCHPRODOTTI\"")
-public class Batchprodotti {
+
+public class BatchProdotti {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "\"Id\"", nullable = false)
@@ -16,11 +19,24 @@ public class Batchprodotti {
     @JoinColumn(name = "\"Id.Prodotto\"", nullable = false)
     private Prodotti prodotto;
 
+    @OneToMany(mappedBy="batch_prodotti")
+    private List<BatchScaffale> batch_scaffali = new ArrayList<>();
+
+    @OneToMany(mappedBy="batch_prodotti")
+    private List<Task> task = new ArrayList<>();
+
     @Column(name = "\"Qta\"", nullable = false)
     private Integer qta;
 
     @Column(name = "\"Scadenza\"", nullable = false)
     private LocalDate scadenza;
+
+    public BatchProdotti() {}
+    public BatchProdotti(Prodotti prodotto, Integer qta, LocalDate scadenza) {
+        this.prodotto = prodotto;
+        this.qta = qta;
+        this.scadenza = scadenza;
+    }
 
     public Integer getId() {
         return id;
@@ -53,5 +69,14 @@ public class Batchprodotti {
     public void setScadenza(LocalDate scadenza) {
         this.scadenza = scadenza;
     }
+
+    public List<BatchScaffale> getBatch_scaffali() {
+        return batch_scaffali;
+    }
+
+    public List<Task> getTask() {
+        return task;
+    }
+
 
 }

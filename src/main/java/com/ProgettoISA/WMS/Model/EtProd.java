@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 
 @Entity
 @Table(name = "\"ETPROD\"")
-public class Etprod {
+public class EtProd {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -18,6 +18,14 @@ public class Etprod {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "\"Id.Etichetta\"", nullable = false)
     private Etichette etichetta;
+
+    public EtProd() {
+    }
+
+    public EtProd(Prodotti prodotto, Etichette etichetta) {
+        this.prodotto = prodotto;
+        this.etichetta = etichetta;
+    }
 
     public Integer getId() {
         return id;
