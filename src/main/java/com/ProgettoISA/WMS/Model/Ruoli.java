@@ -3,6 +3,7 @@ package com.ProgettoISA.WMS.Model;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 
 @Entity
@@ -11,16 +12,19 @@ public class Ruoli {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    private String nome_ruolo;
 
+    @Column(name = "Nome")
+    private String nomeRuolo;
+
+    @JsonIgnore // MAGIA: Evita il loop infinito del JSON!
     @OneToMany(mappedBy = "ruolo")
     private List<Utenti> lista_ruolo_utenti = new ArrayList<>();
 
     public Ruoli() {
     }
 
-    public Ruoli(String nome_ruolo) {
-        this.nome_ruolo = nome_ruolo;
+    public Ruoli(String nomeRuolo) {
+        this.nomeRuolo = nomeRuolo;
     }
 
     public Long getId() {
@@ -31,12 +35,12 @@ public class Ruoli {
         this.id = id;
     }
 
-    public String getNome_ruolo() {
-        return nome_ruolo;
+    public String getNomeRuolo() {
+        return nomeRuolo;
     }
 
-    public void setNome_ruolo(String nome_ruolo) {
-        this.nome_ruolo = nome_ruolo;
+    public void setNomeRuolo(String nomeRuolo) {
+        this.nomeRuolo = nomeRuolo;
     }
 
     public List<Utenti> getLista_ruolo_utenti() {

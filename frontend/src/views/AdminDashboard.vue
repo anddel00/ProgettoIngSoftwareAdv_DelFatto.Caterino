@@ -1,78 +1,186 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 
-// Dati finti (Mock) che in futuro arriveranno da Spring Boot
-const prodotti = ref([
-  { id: 1, nome: "Vaccino Pfizer", spazioUnitario: 2, prezzo: 15.50, minTemp: -80, maxTemp: -20 },
-  { id: 2, nome: "Mele Golden", spazioUnitario: 5, prezzo: 2.00, minTemp: 2, maxTemp: 8 },
-  { id: 3, nome: "Detersivo Piatti", spazioUnitario: 10, prezzo: 1.50, minTemp: 0, maxTemp: 40 }
-])
+const router = useRouter()
+const nomeUtente = ref('')
+
+onMounted(() => {
+  // Recuperiamo il nome dell'utente loggato salvato durante il login
+  nomeUtente.value = localStorage.getItem('nomeUtente') || 'Amministratore'
+})
+
+const logout = () => {
+  // Puliamo i dati e torniamo al login
+  localStorage.clear()
+  router.push('/')
+}
 </script>
 
 <template>
-  <div class="dashboard-container">
-    <h1>📦 Gestione Inventario WMS</h1>
-    <p>Benvenuto nell'area Admin. Qui puoi monitorare le merci stoccate.</p>
+  <div class="dashboard-layout">
 
-    <table class="inventario-table">
-      <thead>
-      <tr>
-        <th>ID</th>
-        <th>Nome Prodotto</th>
-        <th>Spazio (Unitario)</th>
-        <th>Prezzo (€)</th>
-        <th>Temp. Min</th>
-        <th>Temp. Max</th>
-      </tr>
-      </thead>
-      <tbody>
-      <tr v-for="prodotto in prodotti" :key="prodotto.id">
-        <td>{{ prodotto.id }}</td>
-        <td><strong>{{ prodotto.nome }}</strong></td>
-        <td>{{ prodotto.spazioUnitario }} u</td>
-        <td>{{ prodotto.prezzo.toFixed(2) }}</td>
-        <td class="freddo">{{ prodotto.minTemp }} °C</td>
-        <td class="caldo">{{ prodotto.maxTemp }} °C</td>
-      </tr>
-      </tbody>
-    </table>
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h2>📦 WMS Admin</h2>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-item active">🏠 Home</div>
+        <div class="nav-item">🗺️ Mappa</div>
+        <div class="nav-item" @click="router.push('/GestioneDipendenti')">👥 Dipendenti</div>
+        <div class="nav-item">🕒 Turni</div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button @click="logout" class="btn-logout">🚪 Esci</button>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <h1>Benvenuto, {{ nomeUtente }}! 👋</h1>
+      </header>
+
+      <div class="content-area">
+        <div class="dashboard-cards">
+          <div class="card">
+            <h3>📋 Ultimi Eventi</h3>
+            <p class="empty-state">Nessun task recente al momento.</p>
+          </div>
+
+          <div class="card">
+            <h3>🚚 Arrivi Previsti</h3>
+            <p class="empty-state">Nessun nuovo arrivo registrato.</p>
+          </div>
+        </div>
+      </div>
+    </main>
+
   </div>
 </template>
 
 <style scoped>
-.dashboard-container {
-  font-family: Arial, sans-serif;
-  padding: 20px;
-  max-width: 900px;
-  margin: 0 auto;
+/* ------- RESET E LAYOUT PRINCIPALE ------- */
+.dashboard-layout {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  background-color: #f4f6f9;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  margin: 0; /* Rimuove margini di default */
 }
 
-h1 {
+/* ------- SIDEBAR ------- */
+.sidebar {
+  width: 250px;
+  background-color: #2c3e50;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+}
+
+.sidebar-header {
+  padding: 20px;
+  text-align: center;
+  border-bottom: 1px solid #34495e;
+}
+
+.sidebar-nav {
+  flex-grow: 1;
+  padding: 20px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.nav-item {
+  padding: 15px 25px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.3s ease;
+  color: #ecf0f1;
+}
+
+.nav-item:hover {
+  background-color: #34495e;
+  padding-left: 30px; /* Piccolo effetto di scorrimento al passaggio del mouse */
+}
+
+.nav-item.active {
+  background-color: #27ae60;
+  font-weight: bold;
+  border-left: 5px solid #2ecc71;
+}
+
+.sidebar-footer {
+  padding: 20px;
+  border-top: 1px solid #34495e;
+}
+
+.btn-logout {
+  width: 100%;
+  padding: 10px;
+  background-color: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background 0.3s;
+}
+
+.btn-logout:hover {
+  background-color: #c0392b;
+}
+
+/* ------- CONTENUTO PRINCIPALE ------- */
+.main-content {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.topbar {
+  background-color: white;
+  padding: 20px 30px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 24px;
   color: #2c3e50;
 }
 
-.inventario-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 20px;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+.content-area {
+  padding: 30px;
 }
 
-.inventario-table th, .inventario-table td {
-  padding: 12px 15px;
-  border: 1px solid #ddd;
-  text-align: left;
+/* ------- CARD DELLA DASHBOARD ------- */
+.dashboard-cards {
+  display: flex;
+  gap: 20px;
 }
 
-.inventario-table th {
-  background-color: #34495e;
-  color: white;
+.card {
+  background: white;
+  flex: 1;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+  border-top: 4px solid #3498db;
 }
 
-.inventario-table tr:nth-child(even) {
-  background-color: #f9f9f9;
+.card h3 {
+  margin-top: 0;
+  color: #2c3e50;
 }
 
-.freddo { color: #2980b9; font-weight: bold; }
-.caldo { color: #e74c3c; font-weight: bold; }
+.empty-state {
+  color: #7f8c8d;
+  font-style: italic;
+}
 </style>
