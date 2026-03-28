@@ -17,18 +17,39 @@ public class UtentiController {
     @Autowired
     private UtentiService utentiService;
 
+    //L'URL localhost:8080 VIENE GESTITO DAL FILE api.js
 
-    // 1. ENDPOINT: REGISTRAZIONE
-    // URL: POST http://localhost:8080/api/auth/registrati?nomeRuolo=Admin (la chiamata POST crea)
-
+    // ==========================================
+    // 1. ENDPOINT: REGISTRAZIONE (RESTful pulito)
+    // URL: POST http://localhost:8080/api/auth/registrati //prima passavo il nomeRuolo nell'URL--> così è più pulito
+    // ==========================================
     @PostMapping("/registrati")
-    public ResponseEntity<?> registraUtente(@RequestBody Utenti nuovoUtente, @RequestParam String nomeRuolo) {
+    public ResponseEntity<?> registraUtente(@RequestBody Map<String, Object> payload) {
         try {
+
+            // 2. Costruiamo l'utente con i dati restanti del JSON
+            Utenti nuovoUtente = new Utenti();
+            nuovoUtente.setNome((String) payload.get("nome"));
+            nuovoUtente.setCognome((String) payload.get("cognome"));
+            nuovoUtente.setEmail((String) payload.get("email"));
+            nuovoUtente.setPassword((String) payload.get("password"));
+
+            //parsing data di nascita
+            String dataStringa = (String) payload.get("data_nascita");
+            if (dataStringa != null && !dataStringa.isEmpty()) {
+                nuovoUtente.setData_nascita(java.sql.Date.valueOf(dataStringa));
+            }
+
+            String nomeRuolo = (String) payload.get("ruolo"); //passata come stringa perchè non abbiamo un vero e proprio campo ruolo nel DB
+
+            // 3. Passiamo tutto al Service
             Utenti utenteSalvato = utentiService.registraUtente(nuovoUtente, nomeRuolo);
             return ResponseEntity.ok(utenteSalvato);
+
         } catch (IllegalArgumentException e) {
-            // Se l'email esiste già o il ruolo è sbagliato, restituiamo un errore 400 (Bad Request)
             return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Errore nel formato dei dati inviati.");
         }
     }
 

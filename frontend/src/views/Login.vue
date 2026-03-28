@@ -1,8 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
-
+import api from '../api'
 const router = useRouter()
 const email = ref('')
 const password = ref('')
@@ -13,7 +12,7 @@ const faiLogin = async () => {
 
   try {
 
-    const response = await axios.post('http://localhost:8080/api/auth/login', { //chiamata reale al backend
+    const response = await api.post('/api/auth/login', { //chiamata reale al backend
       email: email.value,
       password: password.value
     });
@@ -24,6 +23,7 @@ const faiLogin = async () => {
 
     // Salviamo nel browser per usarli in altre pagine
     localStorage.setItem('nomeUtente', utenteLoggato.nome + ' ' + utenteLoggato.cognome);
+    localStorage.setItem('emailUtente', utenteLoggato.email); // In questo modo identifichiamo univocamente l'utente loggato
     localStorage.setItem('ruolo', ruoloUtente);
 
     // Navigazione

@@ -79,6 +79,7 @@ public class UtentiService {
         utenteEsistente.setNome(datiAggiornati.getNome());
         utenteEsistente.setCognome(datiAggiornati.getCognome());
         utenteEsistente.setEmail(datiAggiornati.getEmail());
+        utenteEsistente.setData_nascita(datiAggiornati.getData_nascita());
 
         // Se l'admin ha inserito una nuova password, la criptiamo e la salviamo.
         // Altrimenti, lasciamo quella vecchia intatta.
