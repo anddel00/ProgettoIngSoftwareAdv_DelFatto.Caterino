@@ -1,31 +1,45 @@
 package com.ProgettoISA.WMS;
 
+import com.ProgettoISA.WMS.Model.Ruoli;
+import com.ProgettoISA.WMS.Model.Utenti;
+import com.ProgettoISA.WMS.Repository.RuoliRepository;
+import com.ProgettoISA.WMS.Service.UtentiService;
 import org.springframework.boot.CommandLineRunner;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+
+import java.util.Date;
 
 @Component
 public class DatabaseTestRunner implements CommandLineRunner {
 
-    private final JdbcTemplate jdbcTemplate;
+    private final RuoliRepository ruoliRepository;
+    private final UtentiService utentiService;
 
-    public DatabaseTestRunner(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+    public DatabaseTestRunner(RuoliRepository ruoliRepository, UtentiService utentiService) {
+        this.ruoliRepository = ruoliRepository;
+        this.utentiService = utentiService;
     }
 
     @Override
     public void run(String... args) {
-        System.out.println("⏳ Test connessione al database AWS RDS in corso...");
+        System.out.println("⏳ Preparazione dati nel database H2...");
 
+        // 1. Creiamo i ruoli se non esistono
+        if (ruoliRepository.findByNomeRuolo("Admin").isEmpty()) {
+            ruoliRepository.save(new Ruoli("Admin"));
+            ruoliRepository.save(new Ruoli("Dipendente"));
+            System.out.println("✅ Ruoli 'Admin' e 'Dipendente' creati!");
+        }
+
+        // 2. Creiamo l'utente Admin per il test
         try {
-            // Eseguiamo una query nativa di PostgreSQL per farci dire la versione
-            String result = jdbcTemplate.queryForObject("SELECT version();", String.class);
-
-            System.out.println("✅ CONNESSIONE STABILITA CON SUCCESSO!");
-            System.out.println("🐘 Versione Database: " + result);
-
-        } catch (Exception e) {
-            System.err.println("❌ ERRORE DI CONNESSIONE: " + e.getMessage());
+            Utenti adminTest = new Utenti("Mario", "Rossi", new Date(), "admin@wms.it", "admin123", null);
+            utentiService.registraUtente(adminTest, "Admin");
+            System.out.println("✅ Utente Admin creato! Usa queste credenziali:");
+            System.out.println("   Email: admin@wms.it");
+            System.out.println("   Pass:  admin123");
+        } catch (IllegalArgumentException e) {
+            System.out.println("ℹ️ Utente di test già presente.");
         }
     }
 }

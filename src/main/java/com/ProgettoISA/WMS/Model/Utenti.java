@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 
 @Entity
@@ -22,9 +23,11 @@ public class Utenti {
     @JoinColumn(name = "Id.Ruolo") 
     private Ruoli ruolo;
 
+    @JsonIgnore // MAGIA: Evita il loop infinito del JSON!
     @OneToMany(mappedBy = "dipendente")
     private List<TurniDip> turniDip = new ArrayList<>();
 
+    @JsonIgnore // MAGIA: Evita il loop infinito del JSON!
     @OneToMany(mappedBy = "dipendente")
     private List<TaskDip> taskDip = new ArrayList<>();
 
@@ -63,7 +66,7 @@ public class Utenti {
         return password;
     }
 
-    public Ruoli getId_ruolo() {
+    public Ruoli getRuolo() { //era ancora getId_ruolo -> cambiato in getRuolo
         return ruolo;
     }
 
