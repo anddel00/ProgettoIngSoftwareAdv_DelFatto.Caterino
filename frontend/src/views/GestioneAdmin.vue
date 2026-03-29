@@ -7,7 +7,7 @@ import api from '../api'
 import AdminSidebar from '../components/AdminSidebar.vue'
 
 const router = useRouter()
-const dipendenti = ref([])
+const utenti = ref([])
 const mostraModale = ref(false)
 const isModifica = ref(false)
 const utenteSelezionatoId = ref(null)
@@ -25,7 +25,7 @@ const form = ref({
   email: '',
   password: '',
   confermaPassword: '', // Solo per la registrazione
-  ruolo: 'Dipendente'
+  ruolo: 'Admin'
 })
 
 // ==========================================
@@ -34,7 +34,7 @@ const form = ref({
 const caricaDipendenti = async () => {
   try {
     const response = await api.get('/api/auth/utenti')
-    dipendenti.value = response.data.filter(utente => utente.ruolo && utente.ruolo.nomeRuolo === 'Dipendente')
+    utenti.value = response.data.filter(utente => utente.ruolo && utente.ruolo.nomeRuolo === 'Admin')
   } catch (error) {
     console.error("Errore di caricamento:", error)
   }
@@ -50,7 +50,7 @@ const apriModaleAggiungi = () => {
   errorMessage.value = ''
   staVerificandoAdmin.value = false
   isPasswordUnlocked.value = false
-  form.value = { nome: '', cognome: '', data_nascita: '', email: '', password: '', confermaPassword: '', ruolo: 'Dipendente' }
+  form.value = { nome: '', cognome: '', data_nascita: '', email: '', password: '', confermaPassword: '', ruolo: 'Admin' }
   mostraModale.value = true
 }
 
@@ -77,7 +77,7 @@ const apriModaleModifica = (dipendente) => {
     email: dipendente.email,
     password: '',
     confermaPassword: '',
-    ruolo: dipendente.ruolo ? dipendente.ruolo.nomeRuolo : 'Dipendente'
+    ruolo: dipendente.ruolo ? dipendente.ruolo.nomeRuolo : 'Admin'
   }
   mostraModale.value = true
 }
@@ -185,11 +185,11 @@ const eliminaDipendente = async (id) => {
       <header class="topbar">
         <div class="header-left">
           <div class="divider"></div>
-          <h1>Gestione Dipendenti</h1>
+          <h1>Gestione Amministratori</h1>
         </div>
         <button @click="apriModaleAggiungi" class="btn-primary">
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
-          Nuovo Dipendente
+          Nuovo Amministratore
         </button>
       </header>
 
@@ -208,7 +208,7 @@ const eliminaDipendente = async (id) => {
               </tr>
               </thead>
               <tbody>
-              <tr v-for="dipendente in dipendenti" :key="dipendente.id">
+              <tr v-for="dipendente in utenti" :key="dipendente.id">
                 <td class="text-muted">#{{ dipendente.id }}</td>
                 <td class="font-medium">{{ dipendente.nome }} {{ dipendente.cognome }}</td>
                 <td>{{ dipendente.data_nascita ? new Date(dipendente.data_nascita).toLocaleDateString('it-IT') : '-' }}</td>
@@ -227,7 +227,7 @@ const eliminaDipendente = async (id) => {
                   </button>
                 </td>
               </tr>
-              <tr v-if="dipendenti.length === 0">
+              <tr v-if="utenti.length === 0">
                 <td colspan="6" class="empty-state">
                   <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
                   <p>Nessun utente nel sistema.</p>
@@ -242,7 +242,7 @@ const eliminaDipendente = async (id) => {
     </div> <div v-if="mostraModale" class="modal-overlay">
     <div class="modal-content">
       <div class="modal-header">
-        <h2>{{ isModifica ? 'Modifica Anagrafica' : 'Registra Dipendente' }}</h2>
+        <h2>{{ isModifica ? 'Modifica Anagrafica' : 'Registra Admin' }}</h2>
         <button @click="chiudiModale" class="btn-close">
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
         </button>
