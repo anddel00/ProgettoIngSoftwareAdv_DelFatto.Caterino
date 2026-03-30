@@ -282,11 +282,11 @@ const eliminaDipendente = async (id) => {
             </div>
           </div>
           <div class="form-group">
-            <label>Ruolo di sistema</label>
-            <select v-model="form.ruolo">
-              <option value="Dipendente">Dipendente Operativo</option>
-              <option value="Admin">Amministratore (Admin)</option>
-            </select>
+            <label>Ruolo di sistema assegnato</label>
+            <div class="role-badge fixed-role-admin">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+              <span>Amministratore (Admin)</span>
+            </div>
           </div>
         </template>
 
@@ -467,4 +467,10 @@ const eliminaDipendente = async (id) => {
 .error-banner svg { width: 20px; height: 20px; }
 
 .modal-actions { padding: 20px 24px; border-top: 1px solid #e2e8f0; background: #f8fafc; display: flex; justify-content: flex-end; gap: 12px; border-radius: 0 0 16px 16px; }
+
+/* ------- BADGE RUOLO FISSO NEL FORM ------- */
+.role-badge { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 8px; font-weight: 600; font-size: 14px; }
+.role-badge svg { width: 20px; height: 20px; }
+.fixed-role-user { background-color: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+.fixed-role-admin { background-color: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
 </style>

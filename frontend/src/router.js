@@ -5,6 +5,7 @@ import Login from './views/Login.vue'
 import AdminDashboard from './views/AdminDashboard.vue'
 import GestioneDipendenti from "./views/GestioneDipendenti.vue";
 import GestioneAdmin from "./views/GestioneAdmin.vue";
+import DipendenteHome from "./views/DipendenteHome.vue";
 
 // 2. Rotte
 const routes = [
@@ -27,6 +28,11 @@ const routes = [
         path: '/GestioneAdmin',
         name: 'GestioneAdmin',
         component: GestioneAdmin
+    },
+    {
+        path: '/DipendenteHome',
+        name: 'DipendenteHome',
+        component: DipendenteHome
     }
 ]
 
