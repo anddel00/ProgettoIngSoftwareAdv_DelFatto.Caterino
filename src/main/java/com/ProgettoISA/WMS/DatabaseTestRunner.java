@@ -62,17 +62,30 @@ public class DatabaseTestRunner implements CommandLineRunner {
             // Usiamo il costruttore vuoto e i setter per semplicità (mettiamo null agli scaffali per ora)
             Task task1 = new Task();
             task1.setDescrizione("Prelievo iPhone 15 Pro Max");
-            task1.setTipo_task("PRELIEVO");
+            task1.setTipo_task("INBOUND");
             task1.setStato_task("DA_FARE");
             task1.setQta_spostata(2);
             // Salviamo il Task nella tabella TASK
             taskRepository.save(task1);
 
             // Creiamo il collegamento: Assegniamo il task1 a Luigi Verdi
-            TaskDip assegnazione = new TaskDip(dipendenteTest, task1);
-            taskDipRepository.save(assegnazione);
+            TaskDip assegnazione1 = new TaskDip(dipendenteTest, task1);
+            taskDipRepository.save(assegnazione1);
 
-            System.out.println("🎯 Task assegnato con successo a Luigi Verdi!");
+            // Usiamo il costruttore vuoto e i setter per semplicità (mettiamo null agli scaffali per ora)
+            Task task2 = new Task();
+            task2.setDescrizione("Spostamento confezione surgelati");
+            task2.setTipo_task("SPOSTAMENTO");
+            task2.setStato_task("DA_FARE");
+            task2.setQta_spostata(2);
+            // Salviamo il Task nella tabella TASK
+            taskRepository.save(task2);
+
+            // Creiamo il collegamento: Assegniamo il task1 a Luigi Verdi
+            TaskDip assegnazione2 = new TaskDip(dipendenteTest, task2);
+            taskDipRepository.save(assegnazione2);
+
+            System.out.println("🎯 Task assegnati con successo a Luigi Verdi!");
         }
 
         System.out.println("🚀 Database pronto e operativo!");

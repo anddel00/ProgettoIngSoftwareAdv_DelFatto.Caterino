@@ -1,18 +1,54 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import api from '../api' // Usando la tua configurazione Axios personalizzata!
 
 const router = useRouter()
 const nomeUtente = ref(localStorage.getItem('nomeUtente') || 'Operatore')
+const emailUtente = ref(localStorage.getItem('email') || 'dipendente@wms.it')
+
 const isTurnoAttivo = ref(false)
+const taskAssegnati = ref([])
 
 const logout = () => {
   localStorage.clear()
   router.push('/')
 }
 
+// Funzione per scaricare i task dal database
+const fetchTasks = async () => {
+  try {
+    const response = await api.get(`/api/tasks/miei-task?email=${emailUtente.value}`)
+    taskAssegnati.value = response.data.filter(t => t.statoTask !== 'COMPLETATO')
+  } catch (error) {
+    console.error("Errore nel recupero dei task:", error)
+  }
+}
+
+// Quando clicca "Inizia Turno", scarichiamo i task veri
 const toggleTurno = () => {
   isTurnoAttivo.value = !isTurnoAttivo.value
+  if (isTurnoAttivo.value) {
+    fetchTasks()
+  }
+}
+
+// Funzione per cambiare lo stato del task cliccando i bottoni
+const aggiornaStatoTask = async (task, nuovoStato) => {
+  try {
+    await api.patch(`/api/tasks/${task.id}/stato?nuovoStato=${nuovoStato}`)
+
+    // Aggiorniamo la UI localmente
+    task.statoTask = nuovoStato
+
+    // Se lo abbiamo completato, lo togliamo dalla vista della Home
+    if (nuovoStato === 'COMPLETATO') {
+      taskAssegnati.value = taskAssegnati.value.filter(t => t.id !== task.id)
+    }
+  } catch (error) {
+    console.error("Errore durante l'aggiornamento dello stato:", error)
+    alert("Impossibile aggiornare lo stato del task. Riprova.")
+  }
 }
 </script>
 
@@ -22,7 +58,7 @@ const toggleTurno = () => {
     <aside class="sidebar">
       <div class="sidebar-header">
         <div class="logo-icon">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
         </div>
         <h2>WMS Worker</h2>
       </div>
@@ -32,7 +68,7 @@ const toggleTurno = () => {
           <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
           Il Mio Turno
         </div>
-        <div class="nav-item">
+        <div class="nav-item" @click="router.push('/DipendenteTask')">
           <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
           I Miei Task
         </div>
@@ -77,38 +113,49 @@ const toggleTurno = () => {
         </div>
 
         <div class="section-header" v-if="isTurnoAttivo">
-          <h3>Task Assegnati</h3>
-          <span class="task-count">2 da completare</span>
+          <h3>Task Attuali</h3>
+          <span class="task-count">{{ taskAssegnati.length }} da completare</span>
         </div>
 
         <div class="task-grid" v-if="isTurnoAttivo">
 
-          <div class="task-card priority-high">
+          <div v-for="task in taskAssegnati" :key="task.id"
+               class="task-card"
+               :class="task.statoTask === 'IN_CARICO' ? 'priority-high' : 'priority-normal'">
+
             <div class="task-header">
-              <span class="task-type pickup">Prelievo</span>
-              <span class="task-id">#TSK-089</span>
+              <span class="task-type" :class="task.tipoTask === 'PRELIEVO' ? 'pickup' : 'dropoff'">
+                {{ task.tipoTask }}
+              </span>
+              <span class="task-id">#TSK-{{ task.id }}</span>
             </div>
-            <h3 class="item-name">iPhone 15 Pro Max - 256GB</h3>
+
+            <h3 class="item-name">{{ task.descrizione }}</h3>
+
             <div class="location-box">
               <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-              <span>Corsia <strong>A</strong> • Scaffale <strong>04</strong></span>
+              <span>Posizione da definire sulla Mappa</span>
             </div>
-            <div class="qty-box">Quantità: <strong>2 unità</strong></div>
-            <button class="btn-primary w-full mt-4">Conferma Prelievo</button>
+
+            <div class="qty-box">Quantità da spostare: <strong>{{ task.quantita }} unità</strong></div>
+
+            <button v-if="task.statoTask === 'DA_FARE'"
+                    @click="aggiornaStatoTask(task, 'IN_CARICO')"
+                    class="btn-primary w-full mt-4">
+              Prendi in Carico
+            </button>
+
+            <button v-if="task.statoTask === 'IN_CARICO'"
+                    @click="aggiornaStatoTask(task, 'COMPLETATO')"
+                    class="btn-success w-full mt-4">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width: 18px; display: inline; vertical-align: text-bottom;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+              Conferma Completamento
+            </button>
           </div>
 
-          <div class="task-card priority-normal">
-            <div class="task-header">
-              <span class="task-type dropoff">Stoccaggio</span>
-              <span class="task-id">#TSK-090</span>
-            </div>
-            <h3 class="item-name">MacBook Air M3</h3>
-            <div class="location-box">
-              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-              <span>Corsia <strong>B</strong> • Scaffale <strong>12</strong></span>
-            </div>
-            <div class="qty-box">Quantità: <strong>5 unità</strong></div>
-            <button class="btn-primary w-full mt-4">Conferma Stoccaggio</button>
+          <div v-if="taskAssegnati.length === 0" class="empty-state-modern" style="grid-column: 1 / -1;">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            <p>Ottimo lavoro! Non ci sono task attivi al momento.</p>
           </div>
 
         </div>
@@ -122,7 +169,6 @@ const toggleTurno = () => {
     </main>
   </div>
 </template>
-
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
@@ -201,4 +247,7 @@ const toggleTurno = () => {
 .empty-state-modern { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 0; color: #94a3b8; }
 .empty-state-modern svg { width: 64px; height: 64px; margin-bottom: 16px; opacity: 0.5; }
 .empty-state-modern p { margin: 0; font-size: 16px; font-weight: 500; }
+
+.btn-success { background-color: #10b981; color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; transition: all 0.2s; }
+.btn-success:hover { background-color: #059669; }
 </style>
