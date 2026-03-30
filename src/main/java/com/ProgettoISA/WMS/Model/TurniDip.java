@@ -2,8 +2,6 @@ package com.ProgettoISA.WMS.Model;
 
 import java.util.Date;
 
-import javax.swing.text.TabableView;
-
 import jakarta.persistence.*;
 
 @Entity
@@ -12,16 +10,17 @@ public class TurniDip {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
+
     @ManyToOne
-    @JoinColumn(name = "Id.Dipendente")
+    @JoinColumn(name = "\"Id.Dipendente\"") // <- Aggiungi \" \"
     private Utenti dipendente;
 
     @ManyToOne
-    @JoinColumn(name = "Id.Turno")
+    @JoinColumn(name = "\"Id.Turno\"")      // <- Aggiungi \" \"
     private Turni turno;
 
-
+public TurniDip()
+{}
     public TurniDip(Utenti dipendente, Turni turno) {
         this.dipendente = dipendente;
         this.turno = turno;

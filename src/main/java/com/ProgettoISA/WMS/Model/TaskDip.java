@@ -8,13 +8,13 @@ public class TaskDip {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
+
     @ManyToOne
-    @JoinColumn(name = "Id.Dipendente")
+    @JoinColumn(name = "\"Id.Dipendente\"") // <- Aggiungi \" \"
     private Utenti dipendente;
 
     @ManyToOne
-    @JoinColumn(name = "Id.Task")
+    @JoinColumn(name = "\"Id.Task\"")       // <- Aggiungi \" \"
     private Task task;
 
     public TaskDip() {

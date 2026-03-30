@@ -1,8 +1,12 @@
 package com.ProgettoISA.WMS;
 
 import com.ProgettoISA.WMS.Model.Ruoli;
+import com.ProgettoISA.WMS.Model.Task;
+import com.ProgettoISA.WMS.Model.TaskDip;
 import com.ProgettoISA.WMS.Model.Utenti;
 import com.ProgettoISA.WMS.Repository.RuoliRepository;
+import com.ProgettoISA.WMS.Repository.TaskDipRepository;
+import com.ProgettoISA.WMS.Repository.TaskRepository;
 import com.ProgettoISA.WMS.Service.UtentiService;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
@@ -14,42 +18,63 @@ public class DatabaseTestRunner implements CommandLineRunner {
 
     private final RuoliRepository ruoliRepository;
     private final UtentiService utentiService;
+    private final TaskRepository taskRepository;
+    private final TaskDipRepository taskDipRepository;
 
-    public DatabaseTestRunner(RuoliRepository ruoliRepository, UtentiService utentiService) {
+    // Costruttore con tutti i repository iniettati
+    public DatabaseTestRunner(RuoliRepository ruoliRepository, UtentiService utentiService,
+                              TaskRepository taskRepository, TaskDipRepository taskDipRepository) {
         this.ruoliRepository = ruoliRepository;
         this.utentiService = utentiService;
+        this.taskRepository = taskRepository;
+        this.taskDipRepository = taskDipRepository;
     }
 
     @Override
     public void run(String... args) {
-        System.out.println("⏳ Preparazione dati nel database H2...");
+        System.out.println("⏳ Preparazione dati nel database...");
 
+        // 1. Ruoli
         if (ruoliRepository.findByNomeRuolo("Admin").isEmpty()) {
             ruoliRepository.save(new Ruoli("Admin"));
             ruoliRepository.save(new Ruoli("Dipendente"));
-            System.out.println("✅ Ruoli creati!");
         }
 
+        // 2. Utenti
         try {
             Utenti adminTest = new Utenti("Mario", "Rossi", new Date(), "admin@wms.it", "admin123", null);
             utentiService.registraUtente(adminTest, "Admin");
-            System.out.println("✅ Admin creato! Email: admin@wms.it");
-            //paswword hash
-            System.out.println("   🔒 Hash salvato: " + adminTest.getPassword());
-        } catch (IllegalArgumentException e) {
-            System.out.println("ℹ️ Admin già presente.");
-        }
+        } catch (IllegalArgumentException e) { }
 
+        Utenti dipendenteTest = null;
         try {
-            Utenti dipendenteTest = new Utenti("Luigi", "Verdi", new Date(), "dipendente@wms.it", "user123", null);
+            dipendenteTest = new Utenti("Luigi", "Verdi", new Date(), "dipendente@wms.it", "user123", null);
             utentiService.registraUtente(dipendenteTest, "Dipendente");
-            System.out.println("✅ Dipendente creato! Email: dipendente@wms.it");
-       //password hash
-            System.out.println("   🔒 Hash salvato: " + dipendenteTest.getPassword());
+            System.out.println("✅ Dipendente Luigi Verdi pronto all'azione!");
         } catch (IllegalArgumentException e) {
             System.out.println("ℹ️ Dipendente già presente.");
         }
 
-        System.out.println("🚀 Database pronto!");
+        // 3. Creazione di un Task di Prova
+        if (taskRepository.count() == 0 && dipendenteTest != null) {
+            System.out.println("📦 Creazione Task di test...");
+
+            // Usiamo il costruttore vuoto e i setter per semplicità (mettiamo null agli scaffali per ora)
+            Task task1 = new Task();
+            task1.setDescrizione("Prelievo iPhone 15 Pro Max");
+            task1.setTipo_task("PRELIEVO");
+            task1.setStato_task("DA_FARE");
+            task1.setQta_spostata(2);
+            // Salviamo il Task nella tabella TASK
+            taskRepository.save(task1);
+
+            // Creiamo il collegamento: Assegniamo il task1 a Luigi Verdi
+            TaskDip assegnazione = new TaskDip(dipendenteTest, task1);
+            taskDipRepository.save(assegnazione);
+
+            System.out.println("🎯 Task assegnato con successo a Luigi Verdi!");
+        }
+
+        System.out.println("🚀 Database pronto e operativo!");
     }
 }

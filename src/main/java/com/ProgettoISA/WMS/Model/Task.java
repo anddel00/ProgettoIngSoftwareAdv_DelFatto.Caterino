@@ -13,17 +13,17 @@ public class Task {
     private Long id;
     private String descrizione;
     private String tipo_task;
-    
+
     @ManyToOne
-    @JoinColumn(name = "Id.Batch")
+    @JoinColumn(name = "\"Id.Batch\"")
     private BatchProdotti batch_prodotti;
 
     @ManyToOne
-    @JoinColumn(name = "Id.ScaffaleInizio")
+    @JoinColumn(name = "\"Id.ScaffaleInizio\"")
     private Scaffali scaffale_inizio;
 
     @ManyToOne
-    @JoinColumn(name = "Id.ScaffaleFine") 
+    @JoinColumn(name = "\"Id.ScaffaleFine\"")
     private Scaffali scaffale_fine;
 
     private int vecchia_x;
