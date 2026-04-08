@@ -3,34 +3,51 @@ package com.ProgettoISA.WMS.Model;
 import java.util.ArrayList;
 import java.util.List;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "TASK")
+@Table(name = "\"TASK\"")
 public class Task {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "\"Id\"")
     private Long id;
+    @Column(name = "\"Descrizione\"")
     private String descrizione;
+    @Column(name = "\"TipoTask\"")
     private String tipo_task;
     
     @ManyToOne
-    @JoinColumn(name = "Id.Batch")
+    @JoinColumn(name = "\"Id_Batch\"")
     private BatchProdotti batch_prodotti;
 
     @ManyToOne
-    @JoinColumn(name = "Id.ScaffaleInizio")
+    @JoinColumn(name = "\"Id_ScaffaleInizio\"")
     private Scaffali scaffale_inizio;
 
     @ManyToOne
-    @JoinColumn(name = "Id.ScaffaleFine") 
+    @JoinColumn(name = "\"Id_ScaffaleFine\"") 
     private Scaffali scaffale_fine;
 
+    @Column(name = "\"VecchiaX\"")
     private int vecchia_x;
+    @Column(name = "\"VecchiaY\"")
     private int vecchia_y;
+    @Column(name = "\"NuovaX\"")
     private int nuova_x;
+    @Column(name = "\"NuovaY\"")
     private int nuova_y;
+    @Column(name = "\"StatoTask\"")
     private String stato_task;
+    @Column(name = "\"QtaSpostata\"")
     private int qta_spostata;
 
     @OneToMany(mappedBy = "task")
