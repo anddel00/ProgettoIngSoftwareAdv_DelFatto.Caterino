@@ -1,15 +1,18 @@
 package com.ProgettoISA.WMS;
 
+import java.util.Date;
+
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Profile;
+import org.springframework.stereotype.Component;
+
 import com.ProgettoISA.WMS.Model.Ruoli;
 import com.ProgettoISA.WMS.Model.Utenti;
 import com.ProgettoISA.WMS.Repository.RuoliRepository;
 import com.ProgettoISA.WMS.Service.UtentiService;
-import org.springframework.boot.CommandLineRunner;
-import org.springframework.stereotype.Component;
-
-import java.util.Date;
 
 @Component
+@Profile("test") // Questo runner si attiva solo con il profilo "test"
 public class DatabaseTestRunner implements CommandLineRunner {
 
     private final RuoliRepository ruoliRepository;
