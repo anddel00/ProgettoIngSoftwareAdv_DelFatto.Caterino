@@ -1,13 +1,23 @@
 package com.ProgettoISA.WMS.Controller;
 
-import com.ProgettoISA.WMS.Model.Utenti;
-import com.ProgettoISA.WMS.Service.UtentiService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
 import java.util.Map;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.ProgettoISA.WMS.DTO.UtentiDTO;
+import com.ProgettoISA.WMS.Model.Utenti;
+import com.ProgettoISA.WMS.Service.UtentiService;
 
 @RestController //trasferiamo i dati in JSON
 @RequestMapping("/api/auth") //URL base per tutti gli endpoint di questo controller
@@ -66,8 +76,15 @@ public class UtentiController {
             // Chiamiamo il Service
             Utenti utenteLoggato = utentiService.effettuaLogin(email, password);
 
+            UtentiDTO utenteDTO = new UtentiDTO(
+                    utenteLoggato.getId(),
+                    utenteLoggato.getNome(),
+                    utenteLoggato.getCognome(),
+                    utenteLoggato.getEmail(),
+                    utenteLoggato.getRuolo().getNomeRuolo() //assumendo che Ruoli abbia un campo nomeRuolo
+            );
             // Se tutto va bene, restituiamo i dati dell'utente in JSON
-            return ResponseEntity.ok(utenteLoggato);
+            return ResponseEntity.ok(utenteDTO);
 
         } catch (IllegalArgumentException e) {
 
