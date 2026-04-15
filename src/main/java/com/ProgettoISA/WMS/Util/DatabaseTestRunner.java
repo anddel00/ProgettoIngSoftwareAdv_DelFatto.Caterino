@@ -41,6 +41,7 @@ public class DatabaseTestRunner implements CommandLineRunner {
             admin.setCognome("Rossi");
             admin.setData_nascita(new Date());
             admin.setEmail("admin@wms.it");
+            admin.setPassword("admin123");
             
             // Passiamo l'oggetto admin e la password in chiaro. Il service farà l'hash.
             utentiService.registraUtente(admin, adminRole.getNomeRuolo());
