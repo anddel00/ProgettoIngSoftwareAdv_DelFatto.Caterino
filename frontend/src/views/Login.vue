@@ -51,7 +51,7 @@ const faiLogin = async () => {
       <p>Inserisci le tue credenziali</p>
 
       <input v-model="email" type="text" placeholder="Email (es: admin@wms.it)" class="input-field" />
-      <input v-model="password" type="password" placeholder="Password (es: admin123)" class="input-field" />
+      <input v-model="password" type="password" placeholder="Password (es: admin123)" class="input-field" @keyup.enter="faiLogin"/>
 
       <p v-if="errorMessage" class="error-text">{{ errorMessage }}</p>
 

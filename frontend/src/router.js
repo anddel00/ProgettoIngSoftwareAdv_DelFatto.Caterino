@@ -5,6 +5,10 @@ import Login from './views/Login.vue'
 import AdminDashboard from './views/AdminDashboard.vue'
 import GestioneDipendenti from "./views/GestioneDipendenti.vue";
 import GestioneAdmin from "./views/GestioneAdmin.vue";
+import DipendenteHome from "./views/DipendenteHome.vue";
+import DipendenteTask from "./views/DipendenteTask.vue";
+import StoricoMovimenti from "./views/StoricoMovimenti.vue";
+
 
 // 2. Rotte
 const routes = [
@@ -27,6 +31,21 @@ const routes = [
         path: '/GestioneAdmin',
         name: 'GestioneAdmin',
         component: GestioneAdmin
+    },
+    {
+        path: '/DipendenteHome',
+        name: 'DipendenteHome',
+        component: DipendenteHome
+    },
+    {
+        path: '/DipendenteTask',
+        name: 'DipendenteTask',
+        component: DipendenteTask
+    },
+    {
+        path: '/StoricoMovimenti',
+        name: 'StoricoMovimenti',
+        component: StoricoMovimenti
     }
 ]
 

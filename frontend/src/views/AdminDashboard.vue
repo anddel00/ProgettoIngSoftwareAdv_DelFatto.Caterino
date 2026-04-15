@@ -1,6 +1,7 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed} from 'vue'
 import { useRouter } from 'vue-router'
+import api from '../api'
 
 import AdminSidebar from '../components/AdminSidebar.vue'
 
@@ -10,6 +11,32 @@ const nomeUtente = ref('')
 onMounted(() => {
   // Recuperiamo il nome dell'utente loggato salvato durante il login
   nomeUtente.value = localStorage.getItem('nomeUtente') || 'Amministratore'
+})
+
+const tuttiTask = ref([])
+
+// prendo tutti i task dal database
+const fetchDashboardData = async () => {
+  try {
+    const response = await api.get('/api/tasks/tutti')
+    tuttiTask.value = response.data
+  } catch (error) {
+    console.error("Errore nel recupero dati dashboard:", error)
+  }
+}
+
+// conto i task non completati (quelli attivi)
+const conteggioTaskAttivi = computed(() => {
+  return tuttiTask.value.filter(t => t.statoTask !== 'COMPLETATO').length
+})
+
+// isolo solo i task di tipo INBOUND ("in ingresso")
+const taskInbound = computed(() => {
+  return tuttiTask.value.filter(t => t.tipoTask === 'INBOUND')
+})
+
+onMounted(() => {
+  fetchDashboardData()
 })
 
 const logout = () => {
@@ -40,7 +67,7 @@ const logout = () => {
         <div class="stats-row">
           <div class="stat-card">
             <span class="stat-title">Task Attivi</span>
-            <h2 class="stat-value">0</h2>
+            <h2 class="stat-value">{{ conteggioTaskAttivi }}</h2> <!--qui conto i task attivi-->
           </div>
           <div class="stat-card">
             <span class="stat-title">Dipendenti in Turno</span>
@@ -66,10 +93,29 @@ const logout = () => {
 
           <div class="card">
             <div class="card-header">
-              <h3>Arrivi Previsti</h3>
+              <h3>Merce in Ingresso</h3>
               <button class="btn-ghost">Gestisci</button>
             </div>
-            <div class="empty-state-modern">
+
+            <div v-if="taskInbound.length > 0" class="inbound-list">
+              <div v-for="task in taskInbound.slice(0, 5)" :key="task.id" class="inbound-item">
+
+                <div class="inbound-info">
+                  <span class="task-id">#TSK-{{ task.id }}</span>
+                  <p class="item-desc">{{ task.descrizione }}</p>
+                </div>
+
+                <div class="inbound-meta">
+                  <span class="qty-badge">{{ task.quantita }} pz</span>
+                  <span class="status-text" :class="task.statoTask === 'DA_FARE' ? 'text-gray' : 'text-blue'">
+          {{ task.statoTask.replace('_', ' ') }}
+        </span>
+                </div>
+
+              </div>
+            </div>
+
+            <div v-else class="empty-state-modern">
               <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"></path></svg>
               <p>Nessun nuovo arrivo registrato.</p>
             </div>
@@ -348,4 +394,17 @@ const logout = () => {
   font-size: 14px;
   font-weight: 500;
 }
+
+.inbound-list { display: flex; flex-direction: column; }
+.inbound-item { padding: 16px 24px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; transition: background-color 0.2s; }
+.inbound-item:hover { background-color: #f8fafc; }
+.inbound-item:last-child { border-bottom: none; }
+.inbound-info { display: flex; flex-direction: column; gap: 4px; }
+.task-id { font-size: 12px; font-weight: 600; color: #94a3b8; font-family: monospace; }
+.item-desc { margin: 0; font-size: 14px; font-weight: 600; color: #0f172a; }
+.inbound-meta { display: flex; align-items: center; gap: 16px; }
+.qty-badge { background: #f1f5f9; color: #475569; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: 700; }
+.status-text { font-size: 12px; font-weight: 700; }
+.text-gray { color: #64748b; }
+.text-blue { color: #2563eb; }
 </style>
