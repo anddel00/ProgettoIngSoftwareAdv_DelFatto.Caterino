@@ -1,26 +1,29 @@
 package com.ProgettoISA.WMS.Model;
 
-import java.util.Date;
-
-import jakarta.persistence.*;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "TURNIDIP")
+@Table(name = "\"TURNIDIP\"")
 public class TurniDip {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
+    
     @ManyToOne
-    @JoinColumn(name = "\"Id.Dipendente\"") // <- Aggiungi \" \"
+    @JoinColumn(name = "\"Id_Dipendente\"")
     private Utenti dipendente;
 
     @ManyToOne
-    @JoinColumn(name = "\"Id.Turno\"")      // <- Aggiungi \" \"
+    @JoinColumn(name = "\"Id_Turno\"")
     private Turni turno;
 
-public TurniDip()
-{}
+
     public TurniDip(Utenti dipendente, Turni turno) {
         this.dipendente = dipendente;
         this.turno = turno;

@@ -1,20 +1,28 @@
 package com.ProgettoISA.WMS.Model;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "TASKDIP")
+@Table(name = "\"TASKDIP\"")
 public class TaskDip {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "\"Id\"")
     private Long id;
-
+    
     @ManyToOne
-    @JoinColumn(name = "\"Id.Dipendente\"") // <- Aggiungi \" \"
+    @JoinColumn(name = "\"Id_Dipendente\"")
     private Utenti dipendente;
 
     @ManyToOne
-    @JoinColumn(name = "\"Id.Task\"")       // <- Aggiungi \" \"
+    @JoinColumn(name = "\"Id_Task\"")
     private Task task;
 
     public TaskDip() {

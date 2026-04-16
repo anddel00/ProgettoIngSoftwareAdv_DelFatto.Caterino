@@ -1,19 +1,36 @@
 package com.ProgettoISA.WMS.Model;
 
-import jakarta.persistence.*;
-
 import java.util.ArrayList;
 
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
+
 @Entity
-@Table(name = "PRODOTTI")
+@Table(name = "\"PRODOTTI\"")
 public class Prodotti {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "\"Id\"")
     private Long id;
+
+    @Column(name = "\"Nome\"")
     private String nome;
+
+    @Column(name = "\"SpazioUnitario\"")
     private Long SpazioUnitario;
+
+    @Column(name = "\"Prezzo\"")
     private Float Prezzo;
+
+    @Column(name = "\"MinTemperatura\"")
     private Long MinTemperatura;
+    
+    @Column(name = "\"MaxTemperatura\"")
     private Long MaxTemperatura;
 
     @OneToMany(mappedBy="prodotto")

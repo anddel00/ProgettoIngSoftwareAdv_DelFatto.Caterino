@@ -2,16 +2,25 @@ package com.ProgettoISA.WMS.Model;
 
 import java.util.List;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "TURNI")
+@Table(name = "\"TURNI\"")
 public class Turni {
     @Id 
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "\"Id\"")
     private Long id;
-    private String nome_turno;
+
+    @Column(name = "\"OrarioInizio\"")
     private String orario_inizio;
+    @Column(name = "\"OrarioFine\"")
     private String orario_fine;
 
     @OneToMany(mappedBy = "turno")
@@ -20,8 +29,7 @@ public class Turni {
     public Turni() {
     }
 
-    public Turni(String nome_turno, String orario_inizio, String orario_fine) {
-        this.nome_turno = nome_turno;
+    public Turni(String orario_inizio, String orario_fine) {
         this.orario_inizio = orario_inizio;
         this.orario_fine = orario_fine;
     }
@@ -32,14 +40,6 @@ public class Turni {
 
     public void setId(Long id) {
         this.id = id;
-    }
-
-    public String getNome_turno() {
-        return nome_turno;
-    }
-
-    public void setNome_turno(String nome_turno) {
-        this.nome_turno = nome_turno;
     }
 
     public String getOrario_inizio() {

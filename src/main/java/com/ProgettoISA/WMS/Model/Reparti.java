@@ -1,22 +1,32 @@
 package com.ProgettoISA.WMS.Model;
 
-import jakarta.persistence.Entity;
-
 import java.util.ArrayList;
 import java.util.List;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "REPARTI")
+@Table(name = "\"REPARTI\"")
 public class Reparti {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "\"Id\"")
     private Long id;
+
+    @Column(name = "\"MaxX\"")
     private Long MaxX;
+
+    @Column(name = "\"MaxY\"")
     private Long MaxY;
-    private Long Temperature;
+
+    @Column(name = "\"Temperatura\"")
+    private Long Temperatura;
 
     @OneToMany(mappedBy = "reparto")
     private List<Mappa> mappe = new ArrayList<>();
@@ -24,10 +34,10 @@ public class Reparti {
     public Reparti() {
     }
 
-    public Reparti(Long MaxX, Long MaxY, Long Temperature) {
+    public Reparti(Long MaxX, Long MaxY, Long Temperatura) {
         this.MaxX = MaxX;
         this.MaxY = MaxY;
-        this.Temperature = Temperature;
+        this.Temperatura = Temperatura;
     }
 
     public Long getId() {
@@ -55,11 +65,11 @@ public class Reparti {
     }
 
     public Long getTemperature() {
-        return Temperature;
+        return Temperatura;
     }
 
     public void setTemperature(Long temperature) {
-        Temperature = temperature;
+        Temperatura = temperature;
     }
 
     public List<Mappa> getMappe() {

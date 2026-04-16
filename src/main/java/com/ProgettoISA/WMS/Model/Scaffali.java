@@ -3,17 +3,32 @@ package com.ProgettoISA.WMS.Model;
 import java.util.ArrayList;
 import java.util.List;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "SCAFFALI")
+@Table(name = "\"SCAFFALI\"")
 public class Scaffali {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "\"Id\"")
     private Long id;   
+
+    @Column(name = "\"MaxRighe\"")
     private int max_righe;
+
+    @Column(name = "\"MaxColonne\"")
     private int max_colonne;
+
+    @Column(name = "\"MaxAltezza\"")
     private int max_altezza;
+
+    @Column(name = "\"MaxPeso\"")
     private int max_peso;
 
     @OneToMany(mappedBy = "scaffale_inizio")

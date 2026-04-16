@@ -5,22 +5,45 @@ import java.util.Date;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import jakarta.persistence.*;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "UTENTI")
+@Table(name = "\"UTENTI\"")
 public class Utenti {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "\"Id\"")
     private Long id;
+
+    @Column(name = "\"Username\"")
+    private String username;
+
+    @Column(name = "\"Nome\"")
     private String nome;
+
+    @Column(name = "\"Cognome\"")
     private String cognome;
+
+    @Column(name = "\"DataNasc\"")
     private Date data_nascita;
+
+    @Column(name = "\"Email\"")
     private String email;
+
+    @Column(name = "\"Password\"")
     private String password;
 
     @ManyToOne
-    @JoinColumn(name = "Id.Ruolo") 
+    @JoinColumn(name = "\"Id_Ruolo\"") 
     private Ruoli ruolo;
 
     @JsonIgnore // MAGIA: Evita il loop infinito del JSON!
@@ -44,6 +67,14 @@ public class Utenti {
 
     public long getId() {
         return id;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
     }
 
     public String getNome() {

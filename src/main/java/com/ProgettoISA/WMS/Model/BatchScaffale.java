@@ -1,6 +1,13 @@
 package com.ProgettoISA.WMS.Model;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "\"BATCHSCAFFALE\"")
@@ -11,11 +18,11 @@ public class BatchScaffale {
     private Integer id;
 
     @ManyToOne
-    @JoinColumn(name = "\"Id.Scaffale\"", nullable = false)
+    @JoinColumn(name = "\"Id_Scaffale\"", nullable = false)
     private Scaffali scaffale;
 
     @ManyToOne
-    @JoinColumn(name = "\"Id.Batch\"", nullable = false)
+    @JoinColumn(name = "\"Id_Batch\"", nullable = false)
     private BatchProdotti batch_prodotti;
 
     @Column(name = "\"Colonna\"", nullable = false)
