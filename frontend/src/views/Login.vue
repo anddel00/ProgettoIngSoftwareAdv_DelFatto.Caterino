@@ -19,7 +19,7 @@ const faiLogin = async () => {
 
     // Risposta OK: se il backend restituisce l'ogetto UTENTE
     const utenteLoggato = response.data;
-    const ruoloUtente = utenteLoggato.ruolo.nomeRuolo; // Leggiamo il ruolo dal JSON
+    const ruoloUtente = utenteLoggato.ruolo; // Leggiamo il ruolo dal JSON
 
     // Salviamo nel browser per usarli in altre pagine
     localStorage.setItem('nomeUtente', utenteLoggato.nome + ' ' + utenteLoggato.cognome);
