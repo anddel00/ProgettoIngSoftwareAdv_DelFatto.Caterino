@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 // 2. Forza Spring a leggere il file application-test.properties
 @ActiveProfiles("test")
-public class LoginIntegrationTest {
+public class LoginIT {
 
     // Questo è il nostro "finto browser" o "finto Axios" che fa le chiamate
     @Autowired

@@ -1,25 +1,48 @@
-name: Spring Boot CD/CI Pipeline
+name: Spring Boot CI/CD Pipeline
 
 on:
   push:
-    branches: [ "**" ] #[ "main", "master" ] se voglio specificare i branch, altrimenti "**" per tutti i branch
+    branches: [ "**" ]
   pull_request:
-    branches: [ "main", "master" ] # Conviene mettere solo main e master per evitare doppie esecuzionii
+    branches: [ "main", "master" ]
 
 jobs:
-  build:
+  # --- JOB 1: TEST DI UNITÀ ---
+  unit-tests:
+    name: Unit Tests
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout del codice
-      uses: actions/checkout@v4
+      - name: Checkout del codice
+        uses: actions/checkout@v4
 
-    - name: Setup Java JDK
-      uses: actions/setup-java@v4
-      with:
-        java-version: '21'
-        distribution: 'temurin'
-        cache: maven 
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
 
-    - name: Compila e Testa con Maven
-      run: mvn clean verify
+      - name: Esegui Test di Unità
+        # Il comando 'test' esegue SOLO i file *Test.java (ignora gli *IT.java)
+        run: mvn clean test
+
+  # --- JOB 2: TEST DI INTEGRAZIONE ---
+  integration-tests:
+    name: Integration Tests
+    # Fondamentale: Questo job parte SOLO se gli Unit Test hanno successo
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del codice
+        uses: actions/checkout@v4
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Esegui Test di Integrazione
+        # Failsafe salta gli unit test e avvia SOLO i file *IT.java (attivando Docker)
+        run: mvn failsafe:integration-test
