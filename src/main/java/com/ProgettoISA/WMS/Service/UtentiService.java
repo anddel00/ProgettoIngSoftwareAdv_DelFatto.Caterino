@@ -6,6 +6,7 @@ import com.ProgettoISA.WMS.Repository.RuoliRepository;
 import com.ProgettoISA.WMS.Repository.UtentiRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -17,9 +18,8 @@ public class UtentiService {
     private UtentiRepository utentiRepository;
     @Autowired
     private RuoliRepository ruoliRepository;
-
-    // Inizializziamo BCrypt per criptare le password
-    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    @Autowired
+    private PasswordEncoder passwordEncoder; //non ho istanziato la classe con "new"
 
     // ==========================================
     // 1. REGISTRAZIONE UTENTE
