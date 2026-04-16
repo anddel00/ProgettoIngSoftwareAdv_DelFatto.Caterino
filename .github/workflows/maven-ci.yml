@@ -45,4 +45,4 @@ jobs:
 
       - name: Esegui Test di Integrazione
         # Failsafe salta gli unit test e avvia SOLO i file *IT.java (attivando Docker)
-        run: mvn failsafe:integration-test
+        run: mvn verify -Dsurefire.skip=true

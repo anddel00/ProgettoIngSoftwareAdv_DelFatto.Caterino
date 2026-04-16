@@ -6,7 +6,7 @@ import org.springframework.test.context.ActiveProfiles;
 
 @SpringBootTest
 @ActiveProfiles("test") // Usa application-test.properties per i test
-class WmsApplicationTests {
+class WmsApplicationIT {
 
 	@Test
 	void contextLoads() {
