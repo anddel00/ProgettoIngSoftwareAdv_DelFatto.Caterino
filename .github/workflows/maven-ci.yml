@@ -4,7 +4,7 @@ on:
   push:
     branches: [ "**" ] #[ "main", "master" ] se voglio specificare i branch, altrimenti "**" per tutti i branch
   pull_request:
-    branches: [ "main", "master" ] # Conviene mettere solo main e master per evitare doppie esecuzioni
+    branches: [ "main", "master" ] # Conviene mettere solo main e master per evitare doppie esecuzionii
 
 jobs:
   build:
