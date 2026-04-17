@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  # --- DATABASE ---
+  db:
+    image: postgres:16-alpine
+    container_name: wms-db
+    restart: always
+    environment:
+      POSTGRES_DB: wms_db
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+
+  # --- BACKEND ---
+  backend:
+    build: .
+    container_name: wms-backend
+    restart: always
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+    environment:
+      # Sovrascriviamo l'URL del DB per puntare al servizio 'db' di Docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/wms_db
+      - SPRING_DATASOURCE_USERNAME=user
+      - SPRING_DATASOURCE_PASSWORD=password
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+
+  # --- FRONTEND ---
+  frontend:
+    build: ./frontend
+    container_name: wms-frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
