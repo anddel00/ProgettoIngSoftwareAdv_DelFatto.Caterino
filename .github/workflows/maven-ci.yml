@@ -46,3 +46,12 @@ jobs:
       - name: Esegui Test di Integrazione
         # Failsafe salta gli unit test e avvia SOLO i file *IT.java (attivando Docker)
         run: mvn verify -Dsurefire.skip=true
+
+      - name: Salva Report JaCoCo su GitHub
+        uses: actions/upload-artifact@v4
+          # if: always() è FONDAMENTALE! Dice a GitHub di salvare il report
+          # anche se un test dovesse fallire (così capisci il perché).
+        if: always()
+        with:
+          name: jacoco-coverage-report
+          path: target/site/jacoco/
