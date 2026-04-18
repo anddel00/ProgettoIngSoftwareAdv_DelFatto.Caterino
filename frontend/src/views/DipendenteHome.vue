@@ -5,7 +5,7 @@ import api from '../api' // Usando la tua configurazione Axios personalizzata!
 
 const router = useRouter()
 const nomeUtente = ref(localStorage.getItem('nomeUtente') || 'Operatore')
-const emailUtente = ref(localStorage.getItem('email') || 'dipendente@wms.it')
+const emailUtente = ref(localStorage.getItem('emailUtente') || 'dipendente@wms.it')
 
 const isTurnoAttivo = ref(false)
 const taskAssegnati = ref([])

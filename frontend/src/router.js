@@ -8,6 +8,7 @@ import GestioneAdmin from "./views/GestioneAdmin.vue";
 import DipendenteHome from "./views/DipendenteHome.vue";
 import DipendenteTask from "./views/DipendenteTask.vue";
 import StoricoMovimenti from "./views/StoricoMovimenti.vue";
+import GestioneTask from "./views/GestioneTask.vue";
 
 
 // 2. Rotte
@@ -46,6 +47,12 @@ const routes = [
         path: '/StoricoMovimenti',
         name: 'StoricoMovimenti',
         component: StoricoMovimenti
+    },
+    {
+        path: '/GestioneTask',
+        name: 'GestioneTask',
+        component: GestioneTask
+
     }
 ]
 
