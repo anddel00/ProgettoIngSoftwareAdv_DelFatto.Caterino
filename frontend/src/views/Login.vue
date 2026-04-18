@@ -10,31 +10,32 @@ const errorMessage = ref('')
 const faiLogin = async () => {
   errorMessage.value = ''
 
-  try {
+  // 1. PULIZIA TOTALE: Dimentichiamo i vecchi utenti prima di accedere
+  localStorage.clear()
 
-    const response = await api.post('/api/auth/login', { //chiamata reale al backend
+  try {
+    const response = await api.post('/api/auth/login', {
       email: email.value,
       password: password.value
     });
 
-    // Risposta OK: se il backend restituisce l'ogetto UTENTE
     const utenteLoggato = response.data;
-    const ruoloUtente = utenteLoggato.ruolo; // Leggiamo il ruolo dal JSON
+    const ruoloUtente = utenteLoggato.ruolo;
 
-    // Salviamo nel browser per usarli in altre pagine
-    localStorage.setItem('nomeUtente', utenteLoggato.nome + ' ' + utenteLoggato.cognome);
-    localStorage.setItem('emailUtente', utenteLoggato.email); // In questo modo identifichiamo univocamente l'utente loggato
-    localStorage.setItem('ruolo', ruoloUtente);
+    // In Login.vue, dentro faiLogin
+    sessionStorage.clear(); // Usa sessionStorage invece di localStorage
+    sessionStorage.setItem('nomeUtente', utenteLoggato.nome + ' ' + utenteLoggato.cognome);
+    sessionStorage.setItem('emailUtente', utenteLoggato.email);
+    sessionStorage.setItem('ruolo', ruoloUtente);
 
-    // Navigazione
-    if (ruoloUtente === 'Admin') {
+    // 2. CONTROLLO RUOLO PIÙ ROBUSTO (Gestisce sia "Admin" che "Amministratore")
+    if (ruoloUtente === 'Admin' || ruoloUtente === 'Amministratore' || ruoloUtente === 'ADMIN') {
       router.push('/dashboard');
     } else {
       router.push('/dipendenteHome');
     }
 
   } catch (error) {
-    // Risposta 401 Unauthorized o simili
     if (error.response && error.response.status === 401) {
       errorMessage.value = 'Email o password errati. Riprova.';
     } else {

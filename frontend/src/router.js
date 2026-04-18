@@ -52,7 +52,11 @@ const routes = [
         path: '/GestioneTask',
         name: 'GestioneTask',
         component: GestioneTask
-
+    },
+    {
+        path: '/GestioneTurni',
+        name: 'GestioneTurni',
+        component: () => import('./views/GestioneTurni.vue')
     }
 ]
 

@@ -13,4 +13,8 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
 
     @Query("SELECT td.task FROM TaskDip td WHERE td.dipendente.email = :email")
     List<Task> findTasksByDipendenteEmail(@Param("email") String email);
+
+    // ADDED: Count tasks that are NOT completed for a specific employee
+    @Query("SELECT COUNT(td) FROM TaskDip td WHERE td.dipendente.email = :email AND td.task.stato_task != 'COMPLETATO'")
+    long countTaskAttiviPerDipendente(@Param("email") String email);
 }

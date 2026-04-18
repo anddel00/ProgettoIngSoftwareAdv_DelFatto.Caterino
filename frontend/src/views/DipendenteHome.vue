@@ -4,14 +4,14 @@ import { useRouter } from 'vue-router'
 import api from '../api' // Usando la tua configurazione Axios personalizzata!
 
 const router = useRouter()
-const nomeUtente = ref(localStorage.getItem('nomeUtente') || 'Operatore')
-const emailUtente = ref(localStorage.getItem('emailUtente') || 'dipendente@wms.it')
+const nomeUtente = ref(sessionStorage.getItem('nomeUtente') || 'Operatore')
+const emailUtente = ref(sessionStorage.getItem('emailUtente') || 'dipendente@wms.it')
 
 const isTurnoAttivo = ref(false)
 const taskAssegnati = ref([])
 
 const logout = () => {
-  localStorage.clear()
+  sessionStorage.clear()
   router.push('/')
 }
 
@@ -30,17 +30,13 @@ const toggleTurno = async () => {
   if (!isTurnoAttivo.value) {
     // --- L'UTENTE VUOLE INIZIARE IL TURNO ---
     try {
-      // Chiamiamo il backend passandogli l'email
       const response = await api.post('/api/turni/inizia', { email: emailUtente.value });
 
-      // Se va a buon fine, attiviamo l'UI e peschiamo i task
       isTurnoAttivo.value = true;
       fetchTasks();
-      // Opzionale: mostra un messaggino di successo
       console.log(response.data.message);
 
     } catch (error) {
-      // Se il backend ci blocca (es. ha già un turno attivo)
       if (error.response && error.response.data) {
         alert(error.response.data.message);
       } else {
@@ -49,18 +45,49 @@ const toggleTurno = async () => {
     }
   } else {
     // --- L'UTENTE VUOLE TERMINARE IL TURNO ---
-    // (Per ora mettiamo un logica fittizia, poi implementeremo il blocco di sicurezza)
     try {
-      // TODO: In futuro qui chiameremo await api.post('/api/turni/termina', { email: emailUtente.value })
+      // Chiamata REALE per terminare il turno
+      const response = await api.post('/api/turni/termina', { email: emailUtente.value });
 
+      // Se il server risponde 200 OK (nessun task attivo), disattiviamo l'UI
       isTurnoAttivo.value = false;
       taskAssegnati.value = []; // Svuotiamo la bacheca
-      alert("Turno terminato. Buon riposo!");
+      alert(response.data.message || "Turno terminato. Buon riposo!");
+
     } catch (error) {
-      console.error("Errore fine turno", error);
+      // Qui intercettiamo il blocco di sicurezza del Backend!
+      if (error.response && error.response.data) {
+        // Mostrerà esattamente: "Impossibile terminare il turno: hai ancora X task attivo/i..."
+        alert(error.response.data.message);
+      } else {
+        console.error("Errore fine turno:", error);
+        alert("Errore di connessione al server durante la fine del turno.");
+      }
     }
   }
 }
+
+// ==========================================
+// CONTROLLO STATO TURNO AL CARICAMENTO
+// ==========================================
+onMounted(async () => {
+  try {
+    // Chiediamo al backend chi è in turno in questo momento
+    const response = await api.get('/api/turni/attivi');
+    const dipendentiInTurno = response.data;
+
+    // Cerchiamo la nostra email in quella lista
+    const hoUnTurnoAttivo = dipendentiInTurno.find(dip => dip.email === emailUtente.value);
+
+    if (hoUnTurnoAttivo) {
+      // Se ci siamo, ripristiniamo la UI e peschiamo i task!
+      isTurnoAttivo.value = true;
+      fetchTasks();
+    }
+  } catch (error) {
+    console.error("Errore nel controllo dello stato del turno:", error);
+  }
+})
 
 // Funzione per cambiare lo stato del task cliccando i bottoni
 const aggiornaStatoTask = async (task, nuovoStato) => {

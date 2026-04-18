@@ -4,13 +4,13 @@ import { useRouter } from 'vue-router'
 import api from '../api'
 
 const router = useRouter()
-const nomeUtente = ref(localStorage.getItem('nomeUtente') || 'Operatore')
-const emailUtente = ref(localStorage.getItem('email') || 'dipendente@wms.it')
+const nomeUtente = ref(sessionStorage.getItem('nomeUtente') || 'Operatore')
+const emailUtente = ref(sessionStorage.getItem('email') || 'dipendente@wms.it')
 
 const tuttiTask = ref([])
 
 const logout = () => {
-  localStorage.clear()
+  sessionStorage.clear()
   router.push('/')
 }
 

@@ -69,13 +69,23 @@ public class TaskService {
     // 2. OTTIENI TUTTI I TASK (per la dashboard admin)
     // ==========================================
     public List<TaskDTO> getTuttiTask() {
-        return taskRepository.findAll().stream()
-                .map(t -> new TaskDTO(
-                        t.getId(),
-                        t.getDescrizione(),
-                        t.getTipo_task(),
-                        t.getStato_task(),
-                        t.getQta_spostata()))
+        // Leggiamo da TaskDip, che contiene sia il Task che l'Utente!
+        return taskDipRepository.findAll().stream()
+                .map(td -> {
+                    Task t = td.getTask();
+                    Utenti dipendente = td.getDipendente();
+                    String nomeCompleto = dipendente.getNome() + " " + dipendente.getCognome();
+
+                    // Usiamo il nuovo costruttore che include il nome!
+                    return new TaskDTO(
+                            t.getId(),
+                            t.getDescrizione(),
+                            t.getTipo_task(),
+                            t.getStato_task(),
+                            t.getQta_spostata(),
+                            nomeCompleto
+                    );
+                })
                 .collect(Collectors.toList());
     }
 

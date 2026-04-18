@@ -7,11 +7,11 @@ import AdminSidebar from '../components/AdminSidebar.vue'
 
 
 const router = useRouter()
-const nomeUtente = ref(localStorage.getItem('nomeUtente') || 'Admin')
+const nomeUtente = ref(sessionStorage.getItem('nomeUtente') || 'Admin')
 const storico = ref([])
 
 const logout = () => {
-  localStorage.clear()
+  sessionStorage.clear()
   router.push('/')
 }
 

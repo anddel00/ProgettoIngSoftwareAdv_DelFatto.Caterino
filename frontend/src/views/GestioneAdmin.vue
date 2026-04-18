@@ -91,7 +91,7 @@ const chiudiModale = () => {
 // ==========================================
 const sbloccaCambioPassword = async () => {
   errorMessage.value = '';
-  const emailAdmin = localStorage.getItem('emailUtente');
+  const emailAdmin = sessionStorage.getItem('emailUtente');
 
   if (!emailAdmin) {
     errorMessage.value = "Errore di sistema: Email Admin non trovata.";

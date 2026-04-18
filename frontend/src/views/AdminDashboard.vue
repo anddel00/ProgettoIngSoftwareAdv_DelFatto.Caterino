@@ -10,7 +10,7 @@ const nomeUtente = ref('')
 
 onMounted(() => {
   // Recuperiamo il nome dell'utente loggato salvato durante il login
-  nomeUtente.value = localStorage.getItem('nomeUtente') || 'Amministratore'
+  nomeUtente.value = sessionStorage.getItem('nomeUtente') || 'Amministratore'
 })
 
 const tuttiTask = ref([])
@@ -41,7 +41,7 @@ onMounted(() => {
 
 const logout = () => {
   // Puliamo i dati e torniamo al login
-  localStorage.clear()
+  sessionStorage.clear()
   router.push('/')
 }
 </script>
