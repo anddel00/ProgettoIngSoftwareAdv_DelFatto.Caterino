@@ -79,10 +79,7 @@ const creaTask = async () => {
     errorMessage.value = 'Descrizione e dipendente sono obbligatori.'
     return
   }
-  if (form.value.quantita < 1) {
-    errorMessage.value = 'La quantità deve essere almeno 1.'
-    return
-  }
+
   try {
     await api.post('/api/tasks/crea-e-assegna', {
       descrizione:     form.value.descrizione,

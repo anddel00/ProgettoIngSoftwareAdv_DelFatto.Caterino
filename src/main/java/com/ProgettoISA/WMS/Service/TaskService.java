@@ -32,6 +32,10 @@ public class TaskService {
     // ==========================================
     @Transactional
     public TaskDTO creaEAssegna(CreaTaskDTO dto) {
+        // --- NUOVA VALIDAZIONE DI SICUREZZA ---
+        if (dto.getQuantita() <= 0) {
+            throw new IllegalArgumentException("Errore di sicurezza: La quantità deve essere maggiore di zero.");
+        }
         // 1. Verifichiamo che il dipendente esista
         Utenti dipendente = utentiRepository.findByEmail(dto.getEmailDipendente())
                 .orElseThrow(() -> new IllegalArgumentException(

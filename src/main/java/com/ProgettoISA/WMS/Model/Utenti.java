@@ -69,6 +69,8 @@ public class Utenti {
         return id;
     }
 
+    public void setId(Long id) {}
+
     public String getUsername() {
         return username;
     }
