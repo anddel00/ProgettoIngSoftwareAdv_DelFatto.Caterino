@@ -34,7 +34,7 @@ const fetchTuttiTask = async () => {
 
 const fetchDipendenti = async () => {
   try {
-    const response = await api.get('/api/auth/utenti')
+    const response = await api.get('/api/utenti/attivi')
     dipendenti.value = response.data.filter(u => u.ruolo?.nomeRuolo === 'Dipendente')
   } catch (error) {
     console.error("Errore nel recupero dei dipendenti:", error)

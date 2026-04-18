@@ -25,11 +25,40 @@ const fetchTasks = async () => {
   }
 }
 
-// Quando clicca "Inizia Turno", scarichiamo i task veri
-const toggleTurno = () => {
-  isTurnoAttivo.value = !isTurnoAttivo.value
-  if (isTurnoAttivo.value) {
-    fetchTasks()
+// Quando clicca il bottone, gestiamo Inizio o Fine turno
+const toggleTurno = async () => {
+  if (!isTurnoAttivo.value) {
+    // --- L'UTENTE VUOLE INIZIARE IL TURNO ---
+    try {
+      // Chiamiamo il backend passandogli l'email
+      const response = await api.post('/api/turni/inizia', { email: emailUtente.value });
+
+      // Se va a buon fine, attiviamo l'UI e peschiamo i task
+      isTurnoAttivo.value = true;
+      fetchTasks();
+      // Opzionale: mostra un messaggino di successo
+      console.log(response.data.message);
+
+    } catch (error) {
+      // Se il backend ci blocca (es. ha già un turno attivo)
+      if (error.response && error.response.data) {
+        alert(error.response.data.message);
+      } else {
+        alert("Errore di connessione al server durante l'inizio del turno.");
+      }
+    }
+  } else {
+    // --- L'UTENTE VUOLE TERMINARE IL TURNO ---
+    // (Per ora mettiamo un logica fittizia, poi implementeremo il blocco di sicurezza)
+    try {
+      // TODO: In futuro qui chiameremo await api.post('/api/turni/termina', { email: emailUtente.value })
+
+      isTurnoAttivo.value = false;
+      taskAssegnati.value = []; // Svuotiamo la bacheca
+      alert("Turno terminato. Buon riposo!");
+    } catch (error) {
+      console.error("Errore fine turno", error);
+    }
   }
 }
 
