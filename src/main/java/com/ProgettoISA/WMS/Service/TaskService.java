@@ -9,9 +9,10 @@ import com.ProgettoISA.WMS.Repository.TaskDipRepository;
 import com.ProgettoISA.WMS.Repository.TaskRepository;
 import com.ProgettoISA.WMS.Repository.UtentiRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.messaging.simp.SimpMessagingTemplate; // <-- IMPORT NECESSARIO
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import org.springframework.messaging.simp.SimpMessageSendingOperations;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -30,8 +31,7 @@ public class TaskService {
 
     // IL NOSTRO "POSTINO" WEBSOCKET
     @Autowired
-    private SimpMessagingTemplate messagingTemplate;
-
+    private SimpMessageSendingOperations messagingTemplate;
     // ==========================================
     // 1. CREA UN TASK E ASSEGNALO A UN DIPENDENTE
     // ==========================================
@@ -63,11 +63,13 @@ public class TaskService {
         // Usiamo l'helper in modo che il DTO abbia anche il nome del dipendente!
         TaskDTO responseDto = convertiInDTO(assegnazione);
 
-        // 🚀 WEBSOCKET (Dentro creaEAssegna)
-        String canalePrivato = "/queue/tasks/" + dipendente.getEmail().trim().toLowerCase();
-        messagingTemplate.convertAndSend(canalePrivato, responseDto);
+        // 🚀 WEBSOCKET: Invia notifica privata al palmarino
+        if (dipendente.getEmail() != null) {
+            String canalePrivato = "/queue/tasks/" + dipendente.getEmail().trim().toLowerCase();
+            messagingTemplate.convertAndSend(canalePrivato, responseDto);
+        }
 
-        // 🚀 WEBSOCKET: Invia notifica pubblica (Topic) per far aggiornare le card dell'Admin
+        // 🚀 WEBSOCKET: Invia notifica pubblica
         messagingTemplate.convertAndSend("/topic/tasks", responseDto);
 
         return responseDto;
@@ -150,11 +152,11 @@ public class TaskService {
             );
         }
 
-        // 🚀 WEBSOCKET: Invia l'aggiornamento sul canale globale
+        // 🚀 WEBSOCKET: Invia aggiornamento globale
         messagingTemplate.convertAndSend("/topic/tasks", responseDto);
 
-        // 🚀 WEBSOCKET (Dentro aggiornaStato)
-        if (assegnazione != null) {
+        // 🚀 WEBSOCKET: Invia sul canale privato (se assegnato e se ha una email)
+        if (assegnazione != null && assegnazione.getDipendente().getEmail() != null) {
             String canalePrivato = "/queue/tasks/" + assegnazione.getDipendente().getEmail().trim().toLowerCase();
             messagingTemplate.convertAndSend(canalePrivato, responseDto);
         }

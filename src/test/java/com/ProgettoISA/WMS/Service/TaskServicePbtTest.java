@@ -13,6 +13,7 @@ import net.jqwik.api.lifecycle.BeforeTry;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.messaging.simp.SimpMessageSendingOperations;
 
 import java.util.Optional;
 
@@ -33,6 +34,9 @@ public class TaskServicePbtTest {
 
     @InjectMocks
     private TaskService taskService;
+
+    @Mock
+    private SimpMessageSendingOperations messagingTemplate;
 
     @BeforeTry
     void setUp() {
