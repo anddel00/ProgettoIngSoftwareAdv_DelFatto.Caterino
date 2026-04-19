@@ -33,6 +33,9 @@ public class Prodotti {
     @Column(name = "\"MaxTemperatura\"")
     private Long MaxTemperatura;
 
+    @Column(name = "\"PesoUnitario\"")
+    private float PesoUnitario;
+
     @OneToMany(mappedBy="prodotto")
     private java.util.List<BatchProdotti> BatchProdotti = new ArrayList<>();
 
@@ -42,9 +45,10 @@ public class Prodotti {
     public Prodotti() {
     }
 
-    public Prodotti(String nome, Long SpazioUnitario, Float Prezzo, Long MinTemperatura, Long MaxTemperatura) {
+    public Prodotti(String nome, Long SpazioUnitario, float PesoUnitario, Float Prezzo, Long MinTemperatura, Long MaxTemperatura) {
         this.nome = nome;
         this.SpazioUnitario = SpazioUnitario;
+        this.PesoUnitario = PesoUnitario;
         this.Prezzo = Prezzo;
         this.MinTemperatura = MinTemperatura;
         this.MaxTemperatura = MaxTemperatura;
@@ -104,6 +108,14 @@ public class Prodotti {
 
     public java.util.List<EtProd> getEtProd() {
         return EtProd;
+    }
+
+    public float getPesoUnitario() {
+        return PesoUnitario;
+    }
+
+    public void setPesoUnitario(float pesoUnitario) {
+        PesoUnitario = pesoUnitario;
     }
 
 }
