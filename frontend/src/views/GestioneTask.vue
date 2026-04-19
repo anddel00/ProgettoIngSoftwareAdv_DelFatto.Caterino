@@ -1,9 +1,11 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../api'
 import AdminSidebar from '../components/AdminSidebar.vue'
+import { useWmsWebSocket } from '../composables/useWmsWebSocket.js'
 
+const { ultimoTaskRicevuto } = useWmsWebSocket()
 const router = useRouter()
 const nomeUtente = ref(sessionStorage.getItem('nomeUtente') || 'Admin')
 
@@ -29,25 +31,27 @@ const fetchTuttiTask = async () => {
     tuttiTask.value = r.data
   } catch (e) { console.error(e) }
 }
-const fetchTuttiTaskAttivi = async () => {
-  try {
-    const r = await api.get('/api/tasks/attivi')
-    tuttiTask.value = r.data
-  } catch (e) { console.error(e) }
-}
 
-// Solo i dipendenti con turno aperto (fonte di verità: TurniDip)
 const fetchDipendenti = async () => {
   try {
-    // 1. Chiamiamo il nuovo URL del TurniController
     const response = await api.get('/api/turni/attivi')
-
-    // 2. Il DTO ci passa "ruolo" come stringa, quindi controlliamo direttamente quella!
     dipendenti.value = response.data.filter(u => u.ruolo === 'Dipendente' || u.ruolo === 'DIPENDENTE')
   } catch (error) {
     console.error("Errore nel recupero dei dipendenti:", error)
   }
 }
+
+watch(ultimoTaskRicevuto, (nuovoTask) => {
+  if (nuovoTask) {
+    const index = tuttiTask.value.findIndex(t => t.id === nuovoTask.id)
+    if (index !== -1) {
+      tuttiTask.value[index] = nuovoTask
+      tuttiTask.value = [...tuttiTask.value] // Forza aggiornamento visivo
+    } else {
+      tuttiTask.value.unshift(nuovoTask)
+    }
+  }
+})
 
 onMounted(() => {
   fetchTuttiTask()
@@ -61,13 +65,36 @@ const taskDaFare    = computed(() => tuttiTask.value.filter(t => t.statoTask ===
 const taskInCarico  = computed(() => tuttiTask.value.filter(t => t.statoTask === 'IN_CARICO').length)
 const taskCompletati = computed(() => tuttiTask.value.filter(t => t.statoTask === 'COMPLETATO').length)
 
-// NUOVA COMPUTED: Filtra la lista principale per nascondere i completati
-const taskAttiviLista = computed(() => tuttiTask.value.filter(t => t.statoTask !== 'COMPLETATO'))
+// --- RICERCA LATO CLIENT ---
+const searchQuery = ref('')
+
+// NUOVA COMPUTED: Filtra i non completati E applica la ricerca
+const taskAttiviLista = computed(() => {
+  // 1. Prima prendiamo solo i task attivi
+  let attivi = tuttiTask.value.filter(t => t.statoTask !== 'COMPLETATO');
+
+  // 2. Se la barra di ricerca è vuota, li ritorniamo tutti
+  if (!searchQuery.value) {
+    return attivi;
+  }
+
+  // 3. Altrimenti filtriamo in base al testo (ID, Descrizione, Operatore, Stato)
+  const q = searchQuery.value.toLowerCase();
+
+  return attivi.filter(task => {
+    const idMatch = task.id ? task.id.toString().includes(q) : false;
+    const descMatch = task.descrizione ? task.descrizione.toLowerCase().includes(q) : false;
+    const operatoreMatch = task.nomeDipendente ? task.nomeDipendente.toLowerCase().includes(q) : false;
+    const statoMatch = task.statoTask ? task.statoTask.replace('_', ' ').toLowerCase().includes(q) : false;
+
+    return idMatch || descMatch || operatoreMatch || statoMatch;
+  });
+})
+
 // ==========================================
-// MODALE
+// MODALE E AZIONI
 // ==========================================
 const apriModale = async () => {
-  // Aggiorna la lista in tempo reale all'apertura del modale
   await fetchDipendenti()
   form.value = { descrizione: '', tipoTask: 'PRELIEVO', quantita: 1, emailDipendente: '' }
   errorMessage.value = ''
@@ -76,9 +103,6 @@ const apriModale = async () => {
 }
 const chiudiModale = () => { mostraModale.value = false }
 
-// ==========================================
-// CREA E ASSEGNA
-// ==========================================
 const creaTask = async () => {
   errorMessage.value   = ''
   successMessage.value = ''
@@ -158,8 +182,26 @@ const getStatoClass = (stato) => {
         </div>
 
         <div class="card table-card">
-          <div class="card-header">
-            <h3>Task Attivi</h3> <span class="badge">{{ taskAttiviLista.length }} task in corso</span> </div>
+          <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding: 20px 24px;">
+            <div style="display: flex; align-items: center; gap: 16px;">
+              <h3>Task Attivi</h3>
+              <span class="badge">{{ taskAttiviLista.length }} risultati</span>
+            </div>
+
+            <div class="search-container" style="position: relative; width: 280px;">
+              <svg style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: #94a3b8;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+              </svg>
+              <input
+                  type="text"
+                  v-model="searchQuery"
+                  placeholder="Cerca per ID, Operatore, Stato..."
+                  style="width: 100%; box-sizing: border-box; padding: 10px 12px 10px 40px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 14px; outline: none; transition: all 0.2s; box-shadow: inset 0 1px 2px rgba(0,0,0,0.02);"
+                  onfocus="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 0 0 3px rgba(59, 130, 246, 0.1)';"
+                  onblur="this.style.borderColor='#cbd5e1'; this.style.boxShadow='inset 0 1px 2px rgba(0,0,0,0.02)';"
+              />
+            </div>
+          </div>
 
           <div class="table-responsive" v-if="taskAttiviLista.length > 0">
             <table class="modern-table">
@@ -197,7 +239,8 @@ const getStatoClass = (stato) => {
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
             </svg>
-            <p>Nessun task attivo presente. Creane uno con il pulsante "Nuovo Task".</p>
+            <p v-if="searchQuery">Nessun task corrisponde alla ricerca "<strong>{{ searchQuery }}</strong>"</p>
+            <p v-else>Nessun task attivo presente. Creane uno con il pulsante "Nuovo Task".</p>
           </div>
         </div>
 
@@ -205,7 +248,6 @@ const getStatoClass = (stato) => {
     </main>
   </div>
 
-  <!-- MODALE -->
   <div v-if="mostraModale" class="modal-overlay">
     <div class="modal-content">
       <div class="modal-header">
@@ -245,23 +287,15 @@ const getStatoClass = (stato) => {
               {{ dip.nome }} {{ dip.cognome }} — {{ dip.email }}
             </option>
           </select>
-
-          <!-- Avviso se nessuno è in turno -->
           <p v-if="dipendenti.length === 0" class="hint-warning">
             ⚠️ Nessun dipendente ha un turno attivo al momento.
           </p>
         </div>
 
         <div v-if="errorMessage" class="error-banner">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-          </svg>
           {{ errorMessage }}
         </div>
         <div v-if="successMessage" class="success-banner">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-          </svg>
           {{ successMessage }}
         </div>
       </div>

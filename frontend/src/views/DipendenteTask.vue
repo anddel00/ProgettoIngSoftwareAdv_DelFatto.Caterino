@@ -1,11 +1,15 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../api'
+import { useWmsWebSocket } from '../composables/useWmsWebSocket.js' // aggiunto .js per sicurezza
 
 const router = useRouter()
 const nomeUtente = ref(sessionStorage.getItem('nomeUtente') || 'Operatore')
 const emailUtente = ref(sessionStorage.getItem('emailUtente') || 'dipendente@wms.it')
+const ruoloUtente = ref(sessionStorage.getItem('ruolo') || 'Dipendente')
+
+const { connectWebSocket, ultimoTaskRicevuto } = useWmsWebSocket()
 
 const tuttiTask = ref([])
 
@@ -14,7 +18,6 @@ const logout = () => {
   router.push('/')
 }
 
-// Scarica tutti i task senza filtri
 const fetchTasks = async () => {
   try {
     const response = await api.get(`/api/tasks/miei-task?email=${emailUtente.value}`)
@@ -24,18 +27,54 @@ const fetchTasks = async () => {
   }
 }
 
-// dividiamo i task in due liste reattive
-const taskAttivi = computed(() => {
-  return tuttiTask.value.filter(t => t.statoTask !== 'COMPLETATO')
+watch(ultimoTaskRicevuto, (nuovoTask) => {
+  if (nuovoTask) {
+    const index = tuttiTask.value.findIndex(t => t.id === nuovoTask.id)
+    if (index !== -1) {
+      tuttiTask.value[index] = nuovoTask
+      tuttiTask.value = [...tuttiTask.value]
+    } else {
+      tuttiTask.value = [nuovoTask, ...tuttiTask.value]
+    }
+  }
 })
 
-const taskCompletati = computed(() => {
-  return tuttiTask.value.filter(t => t.statoTask === 'COMPLETATO')
+// --- RICERCA LATO CLIENT ---
+const searchQuery = ref('')
+
+// Filtra i task ATTIVI in base alla ricerca
+const taskAttiviFiltrati = computed(() => {
+  let attivi = tuttiTask.value.filter(t => t.statoTask !== 'COMPLETATO')
+
+  if (!searchQuery.value) return attivi;
+
+  const q = searchQuery.value.toLowerCase();
+  return attivi.filter(task => {
+    const idMatch = task.id?.toString().includes(q);
+    const descMatch = task.descrizione?.toLowerCase().includes(q);
+    const tipoMatch = task.tipoTask?.toLowerCase().includes(q);
+    return idMatch || descMatch || tipoMatch;
+  });
 })
 
-// Appena apri la pagina, carica i dati
+// Filtra i task COMPLETATI in base alla ricerca
+const taskCompletatiFiltrati = computed(() => {
+  let completati = tuttiTask.value.filter(t => t.statoTask === 'COMPLETATO')
+
+  if (!searchQuery.value) return completati;
+
+  const q = searchQuery.value.toLowerCase();
+  return completati.filter(task => {
+    const idMatch = task.id?.toString().includes(q);
+    const descMatch = task.descrizione?.toLowerCase().includes(q);
+    const tipoMatch = task.tipoTask?.toLowerCase().includes(q);
+    return idMatch || descMatch || tipoMatch;
+  });
+})
+
 onMounted(() => {
   fetchTasks()
+  connectWebSocket(emailUtente.value, ruoloUtente.value)
 })
 </script>
 
@@ -79,17 +118,33 @@ onMounted(() => {
           <span class="greeting">Riepilogo Operativo</span>
           <h1>Gestione Task</h1>
         </div>
+
+        <div class="topbar-right">
+          <div class="search-container" style="position: relative; width: 300px;">
+            <svg style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: #94a3b8;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+            <input
+                type="text"
+                v-model="searchQuery"
+                placeholder="Cerca nei tuoi task..."
+                style="width: 100%; box-sizing: border-box; padding: 10px 12px 10px 40px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 14px; outline: none; transition: all 0.2s; box-shadow: inset 0 1px 2px rgba(0,0,0,0.02);"
+                onfocus="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 0 0 3px rgba(59, 130, 246, 0.1)';"
+                onblur="this.style.borderColor='#cbd5e1'; this.style.boxShadow='inset 0 1px 2px rgba(0,0,0,0.02)';"
+            />
+          </div>
+        </div>
       </header>
 
       <div class="content-area">
 
         <div class="section-header">
           <h3>Task Attivi</h3>
-          <span class="task-count">{{ taskAttivi.length }} in coda</span>
+          <span class="task-count">{{ taskAttiviFiltrati.length }} risultati</span>
         </div>
 
-        <div class="task-grid mb-8" v-if="taskAttivi.length > 0">
-          <div v-for="task in taskAttivi" :key="task.id" class="task-card" :class="task.statoTask === 'IN_CARICO' ? 'priority-high' : 'priority-normal'">
+        <div class="task-grid mb-8" v-if="taskAttiviFiltrati.length > 0">
+          <div v-for="task in taskAttiviFiltrati" :key="task.id" class="task-card" :class="task.statoTask === 'IN_CARICO' ? 'priority-high' : 'priority-normal'">
             <div class="task-header">
               <span class="task-type" :class="task.tipoTask === 'PRELIEVO' ? 'pickup' : 'dropoff'">{{ task.tipoTask }}</span>
               <span class="task-id">#TSK-{{ task.id }}</span>
@@ -107,18 +162,19 @@ onMounted(() => {
         </div>
 
         <div v-else class="empty-state-modern mb-8">
-          <p>Nessun task attivo al momento.</p>
+          <p v-if="searchQuery">Nessun task attivo trovato per "<strong>{{ searchQuery }}</strong>"</p>
+          <p v-else>Nessun task attivo al momento.</p>
         </div>
 
         <hr class="divider" />
 
         <div class="section-header">
           <h3>Storico Completati</h3>
-          <span class="task-count completed-count">{{ taskCompletati.length }} completati</span>
+          <span class="task-count completed-count">{{ taskCompletatiFiltrati.length }} risultati</span>
         </div>
 
-        <div class="task-grid" v-if="taskCompletati.length > 0">
-          <div v-for="task in taskCompletati" :key="task.id" class="task-card completed-card">
+        <div class="task-grid" v-if="taskCompletatiFiltrati.length > 0">
+          <div v-for="task in taskCompletatiFiltrati" :key="task.id" class="task-card completed-card">
             <div class="task-header">
               <span class="badge-success">COMPLETATO</span>
               <span class="task-id">#TSK-{{ task.id }}</span>
@@ -129,14 +185,14 @@ onMounted(() => {
         </div>
 
         <div v-else class="empty-state-modern">
-          <p>Il tuo storico è vuoto.</p>
+          <p v-if="searchQuery">Nessun task completato trovato per "<strong>{{ searchQuery }}</strong>"</p>
+          <p v-else>Il tuo storico è vuoto.</p>
         </div>
 
       </div>
     </main>
   </div>
 </template>
-
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 

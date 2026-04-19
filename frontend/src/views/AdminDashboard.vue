@@ -1,55 +1,92 @@
 <script setup>
-import { ref, onMounted, computed} from 'vue'
+import { ref, onMounted, computed, watch } from 'vue' // Aggiunto watch
 import { useRouter } from 'vue-router'
 import api from '../api'
 
 import AdminSidebar from '../components/AdminSidebar.vue'
+import { useWmsWebSocket } from '../composables/useWmsWebSocket.js' // Il nostro cervello real-time
 
 const router = useRouter()
-const nomeUtente = ref('')
-
-onMounted(() => {
-  // Recuperiamo il nome dell'utente loggato salvato durante il login
-  nomeUtente.value = sessionStorage.getItem('nomeUtente') || 'Amministratore'
-})
+const nomeUtente = ref(sessionStorage.getItem('nomeUtente') || 'Amministratore')
 
 const tuttiTask = ref([])
+const dipendentiInTurnoCount = ref(0) // Nuova variabile per il conteggio reale dei turni
 
-// prendo tutti i task dal database
+// 1. ESTRAIAMO IL WEBSOCKET
+const { ultimoTaskRicevuto } = useWmsWebSocket()
+
+// 2. RECUPERO DATI INIZIALI
 const fetchDashboardData = async () => {
   try {
     const response = await api.get('/api/tasks/tutti')
-    tuttiTask.value = response.data
+    tuttiTask.value = response.data.reverse() // Reverse per avere i più recenti in cima
   } catch (error) {
     console.error("Errore nel recupero dati dashboard:", error)
   }
 }
 
-// conto i task non completati (quelli attivi)
+const fetchTurniAttivi = async () => {
+  try {
+    const response = await api.get('/api/turni/attivi')
+    dipendentiInTurnoCount.value = response.data.length
+  } catch (error) {
+    console.error("Errore nel recupero turni:", error)
+  }
+}
+
+// 3. LA MAGIA DEL REAL-TIME
+// Quando qualcuno sposta un pacco, la dashboard intercetta e aggiorna la lista.
+// Le "computed" sottostanti ricalcoleranno tutto automaticamente!
+watch(ultimoTaskRicevuto, (nuovoTask) => {
+  if (nuovoTask) {
+    const index = tuttiTask.value.findIndex(t => t.id === nuovoTask.id)
+    if (index !== -1) {
+      tuttiTask.value[index] = nuovoTask
+      tuttiTask.value = [...tuttiTask.value]
+    } else {
+      tuttiTask.value = [nuovoTask, ...tuttiTask.value]
+    }
+  }
+})
+
+// 4. COMPUTED PROPERTIES PER LE CARD E STATISTICHE
 const conteggioTaskAttivi = computed(() => {
   return tuttiTask.value.filter(t => t.statoTask !== 'COMPLETATO').length
 })
 
-// isolo solo i task di tipo INBOUND ("in ingresso")
-const taskInbound = computed(() => {
-  return tuttiTask.value.filter(t => t.tipoTask === 'INBOUND')
+// Efficienza = (Task Completati / Totale Task) * 100
+const efficienzaOdierna = computed(() => {
+  if (tuttiTask.value.length === 0) return 0;
+  const completati = tuttiTask.value.filter(t => t.statoTask === 'COMPLETATO').length
+  return Math.round((completati / tuttiTask.value.length) * 100)
+})
+
+// Card 1: Ultimi Eventi (Gli ultimi 5 task COMPLETATI)
+const ultimiCompletati = computed(() => {
+  return tuttiTask.value
+      .filter(t => t.statoTask === 'COMPLETATO')
+      .slice(0, 5) // Prende solo i primi 5
+})
+
+// Card 2: Attività in Corso (Gli ultimi 5 task attualmente IN_CARICO)
+const attivitaInCorso = computed(() => {
+  return tuttiTask.value
+      .filter(t => t.statoTask === 'IN_CARICO')
+      .slice(0, 5)
 })
 
 onMounted(() => {
   fetchDashboardData()
+  fetchTurniAttivi()
 })
 
-const logout = () => {
-  // Puliamo i dati e torniamo al login
-  sessionStorage.clear()
-  router.push('/')
-}
+const vaiAGestioneTask = () => { router.push('/GestioneTask') }
+const vaiAStorico = () => { router.push('/StoricoMovimenti') }
 </script>
 
 <template>
   <div class="dashboard-layout">
-
-    <AdminSidebar /> <!--SIDEBAR CONDIVISA TRA LE PAGINE-->
+    <AdminSidebar />
 
     <main class="main-content">
       <header class="topbar">
@@ -67,66 +104,84 @@ const logout = () => {
         <div class="stats-row">
           <div class="stat-card">
             <span class="stat-title">Task Attivi</span>
-            <h2 class="stat-value">{{ conteggioTaskAttivi }}</h2> <!--qui conto i task attivi-->
+            <h2 class="stat-value">{{ conteggioTaskAttivi }}</h2>
           </div>
           <div class="stat-card">
             <span class="stat-title">Dipendenti in Turno</span>
-            <h2 class="stat-value">0</h2>
+            <h2 class="stat-value" style="color: #3b82f6">{{ dipendentiInTurnoCount }}</h2>
           </div>
           <div class="stat-card">
-            <span class="stat-title">Efficienza Odierna</span>
-            <h2 class="stat-value">--%</h2>
+            <span class="stat-title">Efficienza Complessiva</span>
+            <h2 class="stat-value" :style="{ color: efficienzaOdierna > 50 ? '#10b981' : '#f59e0b' }">
+              {{ efficienzaOdierna }}%
+            </h2>
           </div>
         </div>
 
         <div class="dashboard-cards">
-          <div class="card">
-            <div class="card-header">
-              <h3>Ultimi Eventi</h3>
-              <button class="btn-ghost">Vedi tutti</button>
-            </div>
-            <div class="empty-state-modern">
-              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
-              <p>Nessun task recente al momento.</p>
-            </div>
-          </div>
 
-          <div class="card">
-            <div class="card-header">
-              <h3>Merce in Ingresso</h3>
-              <button class="btn-ghost">Gestisci</button>
+          <div class="card" style="padding: 0; overflow: hidden;">
+            <div class="card-header" style="padding: 24px; margin: 0; border-bottom: 1px solid #e2e8f0; background: #f8fafc;">
+              <h3>Ultimi Eventi Completati</h3>
+              <button @click="vaiAStorico" class="btn-ghost">Vedi storico</button>
             </div>
 
-            <div v-if="taskInbound.length > 0" class="inbound-list">
-              <div v-for="task in taskInbound.slice(0, 5)" :key="task.id" class="inbound-item">
-
+            <div v-if="ultimiCompletati.length > 0" class="inbound-list">
+              <div v-for="task in ultimiCompletati" :key="task.id" class="inbound-item">
                 <div class="inbound-info">
-                  <span class="task-id">#TSK-{{ task.id }}</span>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span class="task-id">#TSK-{{ task.id }}</span>
+                    <span class="badge" style="background: #d1fae5; color: #065f46; font-size: 10px; padding: 2px 6px;">COMPLETATO</span>
+                  </div>
                   <p class="item-desc">{{ task.descrizione }}</p>
+                  <span style="font-size: 12px; color: #64748b;">da: <strong>{{ task.nomeDipendente || 'Operatore' }}</strong></span>
                 </div>
-
-                <div class="inbound-meta">
-                  <span class="qty-badge">{{ task.quantita }} pz</span>
-                  <span class="status-text" :class="task.statoTask === 'DA_FARE' ? 'text-gray' : 'text-blue'">
-          {{ task.statoTask.replace('_', ' ') }}
-        </span>
-                </div>
-
               </div>
             </div>
 
             <div v-else class="empty-state-modern">
-              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"></path></svg>
-              <p>Nessun nuovo arrivo registrato.</p>
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+              <p>Nessun task completato di recente.</p>
             </div>
           </div>
+
+          <div class="card" style="padding: 0; overflow: hidden;">
+            <div class="card-header" style="padding: 24px; margin: 0; border-bottom: 1px solid #e2e8f0; background: #f8fafc;">
+              <h3>In Lavorazione Ora</h3>
+              <button @click="vaiAGestioneTask" class="btn-ghost">Gestisci task</button>
+            </div>
+
+            <div v-if="attivitaInCorso.length > 0" class="inbound-list">
+              <div v-for="task in attivitaInCorso" :key="task.id" class="inbound-item">
+                <div class="inbound-info">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span class="task-id">#TSK-{{ task.id }}</span>
+                    <span class="badge" style="background: #dbeafe; color: #1e40af; font-size: 10px; padding: 2px 6px;">IN CARICO</span>
+                  </div>
+                  <p class="item-desc">{{ task.descrizione }}</p>
+                </div>
+                <div class="inbound-meta" style="flex-direction: column; align-items: flex-end; gap: 4px;">
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <div style="width: 20px; height: 20px; background: #e2e8f0; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold;">
+                      {{ task.nomeDipendente ? task.nomeDipendente.charAt(0) : 'O' }}
+                    </div>
+                    <span style="font-size: 12px; font-weight: 600;">{{ task.nomeDipendente || 'Operatore' }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div v-else class="empty-state-modern">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              <p>Nessuno sta lavorando a un task in questo momento.</p>
+            </div>
+          </div>
+
         </div>
       </div>
     </main>
-
   </div>
 </template>
-
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 

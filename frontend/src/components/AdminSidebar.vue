@@ -1,15 +1,41 @@
 <script setup>
 import { useRouter, useRoute } from 'vue-router'
+import { watch, onMounted } from "vue";
+import { useWmsWebSocket } from '../composables/useWmsWebSocket.js'
 
 const router = useRouter()
-const route = useRoute() // Ci serve per capire in che pagina siamo!
+const route = useRoute()
+
+// Estraiamo ANCHE connectWebSocket
+const {
+  nuoviTaskAttiviBadge,
+  nuoviTaskCompletatiBadge,
+  azzeraBadgeAttivi,
+  azzeraBadgeCompletati,
+  connectWebSocket
+} = useWmsWebSocket()
 
 const logout = () => {
   sessionStorage.clear()
   router.push('/')
 }
-</script>
 
+// Quando la sidebar viene caricata, accendiamo la ricezione globale per l'Admin
+onMounted(() => {
+  const emailUtente = sessionStorage.getItem('emailUtente') || 'admin@wms.it'
+  const ruoloUtente = sessionStorage.getItem('ruolo') || 'ADMIN'
+  connectWebSocket(emailUtente, ruoloUtente)
+})
+
+// LOGICA INTELLIGENTE: Azzeriamo i badge quando l'Admin entra nelle rispettive pagine
+watch(() => route.path, (nuovoPath) => {
+  if (nuovoPath === '/GestioneTask' || nuovoPath === '/AdminHome' || nuovoPath === '/dashboard') {
+    azzeraBadgeAttivi()
+  } else if (nuovoPath === '/StoricoMovimenti') {
+    azzeraBadgeCompletati()
+  }
+}, { immediate: true })
+</script>
 <template>
   <aside class="sidebar">
     <div class="sidebar-header">
@@ -30,6 +56,9 @@ const logout = () => {
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
         </svg>
         Gestione Task
+        <span v-if="nuoviTaskAttiviBadge > 0 && route.path !== '/GestioneTask'" class="badge-notifica badge-blu">
+          {{ nuoviTaskAttiviBadge }}
+        </span>
       </div>
 
       <div class="nav-item">
@@ -42,15 +71,18 @@ const logout = () => {
         Amministratori
       </div>
 
-      <div class="nav-item" :class="{ active: route.path === '/GestioneDipendenti' || route.path === '/GestioneDipendenti' }" @click="router.push('/GestioneDipendenti')">
+      <div class="nav-item" :class="{ active: route.path === '/GestioneDipendenti' }" @click="router.push('/GestioneDipendenti')">
         <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
         Dipendenti
       </div>
 
-        <div class="nav-item" :class="{ active: route.path === '/StoricoMovimenti' || route.path === '/StoricoMovimenti' }" @click="router.push('/StoricoMovimenti')">
-          <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-          Storico Movimenti
-        </div>
+      <div class="nav-item" :class="{ active: route.path === '/StoricoMovimenti' }" @click="router.push('/StoricoMovimenti')">
+        <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+        Storico Movimenti
+        <span v-if="nuoviTaskCompletatiBadge > 0 && route.path !== '/StoricoMovimenti'" class="badge-notifica badge-verde">
+          {{ nuoviTaskCompletatiBadge }}
+        </span>
+      </div>
 
       <div class="nav-item" :class="{ active: route.path === '/GestioneTurni' }" @click="router.push('/GestioneTurni')">
         <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -68,7 +100,6 @@ const logout = () => {
 </template>
 
 <style scoped>
-
 .sidebar { width: 260px; background-color: #0f172a; color: #94a3b8; display: flex; flex-direction: column; border-right: 1px solid #1e293b; }
 .sidebar-header { padding: 30px 24px; display: flex; align-items: center; gap: 12px; }
 .logo-icon svg { width: 28px; height: 28px; color: #6366f1; }
@@ -82,4 +113,23 @@ const logout = () => {
 .sidebar-footer { padding: 24px 16px; }
 .btn-logout { width: 100%; padding: 12px; background-color: transparent; color: #94a3b8; border: 1px solid #1e293b; border-radius: 12px; cursor: pointer; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s; }
 .btn-logout:hover { background-color: #ef4444; color: white; border-color: #ef4444; }
+
+/* STILI PER I BADGE AGGIUNTI */
+.badge-notifica {
+  margin-left: auto; /* Spinge il badge tutto a destra */
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  min-width: 12px;
+  text-align: center;
+  line-height: 1.2;
+}
+.badge-blu {
+  background-color: #3b82f6;
+}
+.badge-verde {
+  background-color: #10b981;
+}
 </style>

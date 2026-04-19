@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface TaskDipRepository extends JpaRepository<TaskDip, Long> {
@@ -17,6 +18,9 @@ public interface TaskDipRepository extends JpaRepository<TaskDip, Long> {
     // Trova tutte le assegnazioni dove lo stato del Task è 'COMPLETATO'
     @Query("SELECT td FROM TaskDip td WHERE td.task.stato_task = 'COMPLETATO'")
     List<TaskDip> findStoricoCompletati();
+
+    // Trova l'assegnazione conoscendo solo l'ID del task
+    Optional<TaskDip> findByTask_Id(Long idTask);
 
 
 }

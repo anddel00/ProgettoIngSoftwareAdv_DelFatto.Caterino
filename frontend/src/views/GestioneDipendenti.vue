@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue' // Aggiunto 'computed'
 import { useRouter } from 'vue-router'
 import api from '../api'
 
@@ -14,9 +14,9 @@ const utenteSelezionatoId = ref(null)
 const errorMessage = ref('')
 
 // --- VARIABILI PER LA SICUREZZA ENTERPRISE ---
-const staVerificandoAdmin = ref(false) // Mostra l'input per la pass dell'admin
-const isPasswordUnlocked = ref(false)  // Sblocca il campo della nuova password
-const adminPassword = ref('')          // La password inserita dall'admin per sbloccarsi
+const staVerificandoAdmin = ref(false)
+const isPasswordUnlocked = ref(false)
+const adminPassword = ref('')
 
 const form = ref({
   nome: '',
@@ -24,7 +24,7 @@ const form = ref({
   data_nascita: '',
   email: '',
   password: '',
-  confermaPassword: '', // Solo per la registrazione
+  confermaPassword: '',
   ruolo: 'Dipendente'
 })
 
@@ -42,8 +42,33 @@ const caricaDipendenti = async () => {
 
 onMounted(() => caricaDipendenti())
 
+// --- RICERCA LATO CLIENT ---
+const searchQuery = ref('')
+
+const dipendentiFiltrati = computed(() => {
+  if (!searchQuery.value) {
+    return dipendenti.value
+  }
+
+  const q = searchQuery.value.toLowerCase()
+
+  return dipendenti.value.filter(dip => {
+    const nomeMatch = dip.nome ? dip.nome.toLowerCase().includes(q) : false;
+    const cognomeMatch = dip.cognome ? dip.cognome.toLowerCase().includes(q) : false;
+    const emailMatch = dip.email ? dip.email.toLowerCase().includes(q) : false;
+    const idMatch = dip.id ? dip.id.toString().includes(q) : false;
+
+    // Permette di cercare "Mario Rossi" interamente
+    const nomeCompletoMatch = dip.nome && dip.cognome
+        ? `${dip.nome} ${dip.cognome}`.toLowerCase().includes(q)
+        : false;
+
+    return idMatch || nomeMatch || cognomeMatch || emailMatch || nomeCompletoMatch;
+  })
+})
+
 // ==========================================
-// 2. GESTIONE MODALI
+// 2. GESTIONE MODALI E SALVATAGGIO (Invariato)
 // ==========================================
 const apriModaleAggiungi = () => {
   isModifica.value = false
@@ -58,13 +83,10 @@ const apriModaleModifica = (dipendente) => {
   isModifica.value = true
   utenteSelezionatoId.value = dipendente.id
   errorMessage.value = ''
-
-  // Resettiamo la sicurezza
   staVerificandoAdmin.value = false
   isPasswordUnlocked.value = false
   adminPassword.value = ''
 
-  // Formattiamo la data dal DB (viene letta come "YYYY-MM-DDTHH:mm:ss") in "YYYY-MM-DD" per l'input type="date"
   let dataFormattata = '';
   if (dipendente.data_nascita) {
     dataFormattata = dipendente.data_nascita.split('T')[0];
@@ -82,13 +104,8 @@ const apriModaleModifica = (dipendente) => {
   mostraModale.value = true
 }
 
-const chiudiModale = () => {
-  mostraModale.value = false
-}
+const chiudiModale = () => { mostraModale.value = false }
 
-// ==========================================
-// 3. LOGICA DI SICUREZZA ENTERPRISE
-// ==========================================
 const sbloccaCambioPassword = async () => {
   errorMessage.value = '';
   const emailAdmin = sessionStorage.getItem('emailUtente');
@@ -99,13 +116,7 @@ const sbloccaCambioPassword = async () => {
   }
 
   try {
-    // verifico la password inserita dall'admin
-    await api.post('/api/auth/login', {
-      email: emailAdmin,
-      password: adminPassword.value
-    });
-
-    // se idetifico l'utente, sblocco la modifica della password
+    await api.post('/api/auth/login', { email: emailAdmin, password: adminPassword.value });
     isPasswordUnlocked.value = true;
     staVerificandoAdmin.value = false;
     adminPassword.value = '';
@@ -114,19 +125,14 @@ const sbloccaCambioPassword = async () => {
   }
 }
 
-// ==========================================
-// 4. SALVATAGGIO NEL DATABASE
-// ==========================================
 const salvaDipendente = async () => {
   errorMessage.value = ''
 
-  // Validazione Campi Base
   if (!form.value.data_nascita) {
     errorMessage.value = "La data di nascita è obbligatoria.";
     return;
   }
 
-  // Validazione Doppia Password (SOLO in Registrazione)
   if (!isModifica.value && form.value.password !== form.value.confermaPassword) {
     errorMessage.value = "Le password non coincidono!";
     return;
@@ -139,7 +145,7 @@ const salvaDipendente = async () => {
         cognome: form.value.cognome,
         data_nascita: form.value.data_nascita,
         email: form.value.email,
-        password: form.value.password // Se è vuota, il backend mantiene quella vecchia grazie alla tua logica in Java!
+        password: form.value.password
       })
     } else {
       await api.post('/api/auth/registrati', {
@@ -151,18 +157,13 @@ const salvaDipendente = async () => {
         ruolo: form.value.ruolo
       })
     }
-
     chiudiModale()
     caricaDipendenti()
-
   } catch (error) {
     errorMessage.value = error.response?.data || "Errore di connessione al server."
   }
 }
 
-// ==========================================
-// 5. ELIMINAZIONE
-// ==========================================
 const eliminaDipendente = async (id) => {
   if (confirm("Sei sicuro di voler eliminare questo dipendente?")) {
     try {
@@ -177,7 +178,6 @@ const eliminaDipendente = async (id) => {
 
 <template>
   <div class="dashboard-layout">
-
     <AdminSidebar />
 
     <div class="main-content">
@@ -195,6 +195,30 @@ const eliminaDipendente = async (id) => {
 
       <main class="content-area">
         <div class="card">
+
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding: 20px 24px;">
+            <div style="display: flex; align-items: center; gap: 16px;">
+              <h3 style="margin: 0; font-size: 18px; color: #0f172a;">Anagrafica Personale</h3>
+              <span class="badge" style="background: #e0e7ff; color: #4f46e5; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: 600;">
+                {{ dipendentiFiltrati.length }} Dipendenti
+              </span>
+            </div>
+
+            <div class="search-container" style="position: relative; width: 280px;">
+              <svg style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: #94a3b8;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+              </svg>
+              <input
+                  type="text"
+                  v-model="searchQuery"
+                  placeholder="Cerca nome, cognome, email..."
+                  style="width: 100%; box-sizing: border-box; padding: 10px 12px 10px 40px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 14px; outline: none; transition: all 0.2s; box-shadow: inset 0 1px 2px rgba(0,0,0,0.02);"
+                  onfocus="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 0 0 3px rgba(59, 130, 246, 0.1)';"
+                  onblur="this.style.borderColor='#cbd5e1'; this.style.boxShadow='inset 0 1px 2px rgba(0,0,0,0.02)';"
+              />
+            </div>
+          </div>
+
           <div class="table-container">
             <table class="data-table">
               <thead>
@@ -208,13 +232,13 @@ const eliminaDipendente = async (id) => {
               </tr>
               </thead>
               <tbody>
-              <tr v-for="dipendente in dipendenti" :key="dipendente.id">
+              <tr v-for="dipendente in dipendentiFiltrati" :key="dipendente.id">
                 <td class="text-muted">#{{ dipendente.id }}</td>
                 <td class="font-medium">{{ dipendente.nome }} {{ dipendente.cognome }}</td>
                 <td>{{ dipendente.data_nascita ? new Date(dipendente.data_nascita).toLocaleDateString('it-IT') : '-' }}</td>
                 <td class="text-muted">{{ dipendente.email }}</td>
                 <td>
-                  <span class="badge" :class="dipendente.ruolo?.nomeRuolo === 'Admin' ? 'badge-admin' : 'badge-user'">
+                  <span class="badge" :class="dipendente.ruolo?.nomeRuolo === 'Admin' ? 'badge-admin' : 'badge-user'" style="background: #f1f5f9; color: #475569; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: 600;">
                     {{ dipendente.ruolo ? dipendente.ruolo.nomeRuolo : 'Nessuno' }}
                   </span>
                 </td>
@@ -227,10 +251,12 @@ const eliminaDipendente = async (id) => {
                   </button>
                 </td>
               </tr>
-              <tr v-if="dipendenti.length === 0">
-                <td colspan="6" class="empty-state">
-                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-                  <p>Nessun utente nel sistema.</p>
+
+              <tr v-if="dipendentiFiltrati.length === 0">
+                <td colspan="6" class="empty-state" style="padding: 60px 0; color: #94a3b8; text-align: center;">
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width: 48px; height: 48px; margin: 0 auto 16px auto; opacity: 0.5;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                  <p v-if="searchQuery">Nessun dipendente trovato per "<strong>{{ searchQuery }}</strong>"</p>
+                  <p v-else>Nessun utente nel sistema.</p>
                 </td>
               </tr>
               </tbody>
@@ -239,102 +265,104 @@ const eliminaDipendente = async (id) => {
         </div>
       </main>
 
-    </div> <div v-if="mostraModale" class="modal-overlay">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2>{{ isModifica ? 'Modifica Anagrafica' : 'Registra Dipendente' }}</h2>
-        <button @click="chiudiModale" class="btn-close">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-        </button>
-      </div>
+    </div>
 
-      <div class="form-body">
-        <div class="form-row">
-          <div class="form-group half">
-            <label>Nome</label>
-            <input v-model="form.nome" type="text" placeholder="Mario" />
-          </div>
-          <div class="form-group half">
-            <label>Cognome</label>
-            <input v-model="form.cognome" type="text" placeholder="Rossi" />
-          </div>
+    <div v-if="mostraModale" class="modal-overlay">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>{{ isModifica ? 'Modifica Anagrafica' : 'Registra Dipendente' }}</h2>
+          <button @click="chiudiModale" class="btn-close">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
         </div>
 
-        <div class="form-group">
-          <label>Data di Nascita</label>
-          <input v-model="form.data_nascita" type="date" />
-        </div>
-
-        <div class="form-group">
-          <label>Email aziendale</label>
-          <input v-model="form.email" type="email" placeholder="mario.rossi@wms.it" />
-        </div>
-
-        <template v-if="!isModifica">
+        <div class="form-body">
           <div class="form-row">
             <div class="form-group half">
-              <label>Password</label>
-              <input v-model="form.password" type="password" placeholder="••••••••" />
+              <label>Nome</label>
+              <input v-model="form.nome" type="text" placeholder="Mario" />
             </div>
             <div class="form-group half">
-              <label>Conferma Password</label>
-              <input v-model="form.confermaPassword" type="password" placeholder="••••••••" />
+              <label>Cognome</label>
+              <input v-model="form.cognome" type="text" placeholder="Rossi" />
             </div>
           </div>
+
           <div class="form-group">
-            <label>Ruolo di sistema assegnato</label>
-            <div class="role-badge fixed-role-user">
-              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-              <span>Dipendente Operativo</span>
-            </div>
+            <label>Data di Nascita</label>
+            <input v-model="form.data_nascita" type="date" />
           </div>
-        </template>
 
-        <template v-if="isModifica">
-          <div class="security-box" :class="{ 'is-unlocked': isPasswordUnlocked, 'is-verifying': staVerificandoAdmin }">
+          <div class="form-group">
+            <label>Email aziendale</label>
+            <input v-model="form.email" type="email" placeholder="mario.rossi@wms.it" />
+          </div>
 
-            <div v-if="!isPasswordUnlocked && !staVerificandoAdmin" class="locked-state">
-              <div class="security-info">
-                <svg class="icon-lock" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
-                <div>
-                  <h4>Sicurezza Account</h4>
-                  <p>La modifica della password è protetta.</p>
+          <template v-if="!isModifica">
+            <div class="form-row">
+              <div class="form-group half">
+                <label>Password</label>
+                <input v-model="form.password" type="password" placeholder="••••••••" />
+              </div>
+              <div class="form-group half">
+                <label>Conferma Password</label>
+                <input v-model="form.confermaPassword" type="password" placeholder="••••••••" />
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Ruolo di sistema assegnato</label>
+              <div class="role-badge fixed-role-user">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                <span>Dipendente Operativo</span>
+              </div>
+            </div>
+          </template>
+
+          <template v-if="isModifica">
+            <div class="security-box" :class="{ 'is-unlocked': isPasswordUnlocked, 'is-verifying': staVerificandoAdmin }">
+
+              <div v-if="!isPasswordUnlocked && !staVerificandoAdmin" class="locked-state">
+                <div class="security-info">
+                  <svg class="icon-lock" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                  <div>
+                    <h4>Sicurezza Account</h4>
+                    <p>La modifica della password è protetta.</p>
+                  </div>
+                </div>
+                <button @click="staVerificandoAdmin = true" class="btn-unlock">Sblocca</button>
+              </div>
+
+              <div v-if="staVerificandoAdmin" class="verify-state">
+                <label>Conferma la tua identità Admin</label>
+                <input v-model="adminPassword" type="password" placeholder="Inserisci la tua password..." />
+                <div class="verify-actions">
+                  <button @click="staVerificandoAdmin = false" class="btn-ghost small">Annulla</button>
+                  <button @click="sbloccaCambioPassword" class="btn-primary small">Verifica</button>
                 </div>
               </div>
-              <button @click="staVerificandoAdmin = true" class="btn-unlock">Sblocca</button>
-            </div>
 
-            <div v-if="staVerificandoAdmin" class="verify-state">
-              <label>Conferma la tua identità Admin</label>
-              <input v-model="adminPassword" type="password" placeholder="Inserisci la tua password..." />
-              <div class="verify-actions">
-                <button @click="staVerificandoAdmin = false" class="btn-ghost small">Annulla</button>
-                <button @click="sbloccaCambioPassword" class="btn-primary small">Verifica</button>
+              <div v-if="isPasswordUnlocked" class="unlocked-state">
+                <div class="security-info success">
+                  <svg class="icon-unlock" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"></path></svg>
+                  <label>Imposta nuova password</label>
+                </div>
+                <input v-model="form.password" type="password" placeholder="Lascia vuoto per non cambiare" />
               </div>
             </div>
+          </template>
 
-            <div v-if="isPasswordUnlocked" class="unlocked-state">
-              <div class="security-info success">
-                <svg class="icon-unlock" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"></path></svg>
-                <label>Imposta nuova password</label>
-              </div>
-              <input v-model="form.password" type="password" placeholder="Lascia vuoto per non cambiare" />
-            </div>
+          <div v-if="errorMessage" class="error-banner">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            {{ errorMessage }}
           </div>
-        </template>
+        </div>
 
-        <div v-if="errorMessage" class="error-banner">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-          {{ errorMessage }}
+        <div class="modal-actions">
+          <button @click="chiudiModale" class="btn-secondary">Annulla</button>
+          <button @click="salvaDipendente" class="btn-success">Salva Dipendente</button>
         </div>
       </div>
-
-      <div class="modal-actions">
-        <button @click="chiudiModale" class="btn-secondary">Annulla</button>
-        <button @click="salvaDipendente" class="btn-success">Salva Dipendente</button>
-      </div>
     </div>
-  </div>
 
   </div>
 </template>

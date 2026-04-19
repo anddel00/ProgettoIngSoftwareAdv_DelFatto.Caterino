@@ -1,14 +1,15 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch , computed } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../api'
-
 import AdminSidebar from '../components/AdminSidebar.vue'
-
+import { useWmsWebSocket } from '../composables/useWmsWebSocket.js'
 
 const router = useRouter()
 const nomeUtente = ref(sessionStorage.getItem('nomeUtente') || 'Admin')
 const storico = ref([])
+
+const { ultimoTaskRicevuto } = useWmsWebSocket()
 
 const logout = () => {
   sessionStorage.clear()
@@ -18,12 +19,59 @@ const logout = () => {
 const fetchStorico = async () => {
   try {
     const response = await api.get('/api/tasks/storico-admin')
-    // Invertiamo l'array così i task più recenti (con ID più alto) appaiono in cima
     storico.value = response.data.reverse()
   } catch (error) {
     console.error("Errore nel recupero dello storico:", error)
   }
 }
+
+// OSSERVIAMO IL WEBSOCKET
+watch(ultimoTaskRicevuto, (nuovoTask) => {
+  if (nuovoTask && nuovoTask.statoTask === 'COMPLETATO') {
+    // Nota: il WebSocket manda un TaskDTO standard (con .id invece di .idTask)
+    // Adattiamo la logica per assicurarci che combaci con lo storico
+    const idDaCercare = nuovoTask.id || nuovoTask.idTask;
+    const esisteGia = storico.value.some(t => t.idTask === idDaCercare || t.id === idDaCercare)
+
+    if (!esisteGia) {
+      // Formattiamo il nuovo task come se fosse arrivato dall'API dello storico
+      const taskStorico = {
+        idTask: nuovoTask.id,
+        nomeDipendente: nuovoTask.nomeDipendente || 'Operatore',
+        tipoTask: nuovoTask.tipoTask,
+        descrizione: nuovoTask.descrizione,
+        quantita: nuovoTask.quantita || nuovoTask.qtaSpostata
+      }
+      storico.value = [taskStorico, ...storico.value]
+    }
+  }
+})
+
+// BARRA DI RICERCA
+const searchQuery = ref('')
+
+// La lista filtrata "in tempo reale"
+const storicoFiltrato = computed(() => {
+  if (!searchQuery.value) {
+    return storico.value
+  }
+
+  const q = searchQuery.value.toLowerCase()
+
+  // Filtra sui campi esatti che stampiamo nella tabella
+  return storico.value.filter(record => {
+    // Assicuriamoci che i campi esistano prima di chiamare toString/toLowerCase
+    const idValido = record.idTask || record.id || '';
+    const descValida = record.descrizione || '';
+    const nomeValido = record.nomeDipendente || '';
+
+    const idMatch = idValido.toString().includes(q)
+    const descMatch = descValida.toLowerCase().includes(q)
+    const opMatch = nomeValido.toLowerCase().includes(q) // Ricerca anche per nome operatore!
+
+    return idMatch || descMatch || opMatch
+  })
+})
 
 onMounted(() => {
   fetchStorico()
@@ -32,7 +80,6 @@ onMounted(() => {
 
 <template>
   <div class="dashboard-layout">
-
     <AdminSidebar />
 
     <main class="main-content">
@@ -50,12 +97,30 @@ onMounted(() => {
       <div class="content-area">
 
         <div class="card table-card">
-          <div class="card-header">
-            <h3>Task Completati</h3>
-            <span class="badge">{{ storico.length }} Registri</span>
+          <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding: 20px 24px;">
+
+            <div style="display: flex; align-items: center; gap: 16px;">
+              <h3>Task Completati</h3>
+              <span class="badge">{{ storicoFiltrato.length }} Registri</span>
+            </div>
+
+            <div class="search-container" style="position: relative; width: 280px;">
+              <svg style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: #94a3b8;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+              </svg>
+              <input
+                  type="text"
+                  v-model="searchQuery"
+                  placeholder="Cerca per ID, Operatore, Oggetto..."
+                  style="width: 100%; box-sizing: border-box; padding: 10px 12px 10px 40px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 14px; outline: none; transition: all 0.2s; box-shadow: inset 0 1px 2px rgba(0,0,0,0.02);"
+                  onfocus="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 0 0 3px rgba(59, 130, 246, 0.1)';"
+                  onblur="this.style.borderColor='#cbd5e1'; this.style.boxShadow='inset 0 1px 2px rgba(0,0,0,0.02)';"
+              />
+            </div>
+
           </div>
 
-          <div class="table-responsive" v-if="storico.length > 0">
+          <div class="table-responsive" v-if="storicoFiltrato.length > 0">
             <table class="modern-table">
               <thead>
               <tr>
@@ -68,11 +133,11 @@ onMounted(() => {
               </tr>
               </thead>
               <tbody>
-              <tr v-for="record in storico" :key="record.idTask">
-                <td class="id-cell">#TSK-{{ record.idTask }}</td>
+              <tr v-for="record in storicoFiltrato" :key="record.idTask || record.id">
+                <td class="id-cell">#TSK-{{ record.idTask || record.id }}</td>
                 <td class="user-cell">
-                  <div class="user-avatar-small">{{ record.nomeDipendente.charAt(0) }}</div>
-                  <strong>{{ record.nomeDipendente }}</strong>
+                  <div class="user-avatar-small">{{ record.nomeDipendente ? record.nomeDipendente.charAt(0) : 'O' }}</div>
+                  <strong>{{ record.nomeDipendente || 'Operatore' }}</strong>
                 </td>
                 <td>
                     <span class="task-type" :class="record.tipoTask === 'PRELIEVO' ? 'pickup' : 'dropoff'">
@@ -80,7 +145,7 @@ onMounted(() => {
                     </span>
                 </td>
                 <td class="desc-cell">{{ record.descrizione }}</td>
-                <td><strong>{{ record.quantita }}</strong></td>
+                <td><strong>{{ record.quantita || record.qtaSpostata }}</strong></td>
                 <td><span class="status-badge-success">Completato</span></td>
               </tr>
               </tbody>
@@ -89,7 +154,8 @@ onMounted(() => {
 
           <div v-else class="empty-state-modern">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
-            <p>Il registro storico è vuoto. Nessun task completato al momento.</p>
+            <p v-if="searchQuery">Nessun risultato trovato per "<strong>{{ searchQuery }}</strong>"</p>
+            <p v-else>Il registro storico è vuoto. Nessun task completato al momento.</p>
           </div>
         </div>
 
