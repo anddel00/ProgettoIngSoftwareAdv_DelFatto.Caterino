@@ -5,7 +5,7 @@ import api from '../api'
 
 const router = useRouter()
 const nomeUtente = ref(sessionStorage.getItem('nomeUtente') || 'Operatore')
-const emailUtente = ref(sessionStorage.getItem('email') || 'dipendente@wms.it')
+const emailUtente = ref(sessionStorage.getItem('emailUtente') || 'dipendente@wms.it')
 
 const tuttiTask = ref([])
 

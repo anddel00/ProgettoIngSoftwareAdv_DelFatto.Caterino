@@ -108,4 +108,19 @@ public class TaskController {
             return ResponseEntity.internalServerError().build();
         }
     }
+
+    // ==========================================
+    // 6. GET /api/tasks/attivi
+    // Ottiene solo i task NON completati (Per GestioneTask.vue)
+    // ==========================================
+    @GetMapping("/attivi")
+    public ResponseEntity<List<TaskDTO>> getTaskAttiviAdmin() {
+        try {
+            return ResponseEntity.ok(taskService.getTaskAttiviAdmin());
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+
 }

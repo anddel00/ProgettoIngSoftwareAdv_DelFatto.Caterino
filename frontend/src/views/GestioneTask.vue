@@ -29,6 +29,12 @@ const fetchTuttiTask = async () => {
     tuttiTask.value = r.data
   } catch (e) { console.error(e) }
 }
+const fetchTuttiTaskAttivi = async () => {
+  try {
+    const r = await api.get('/api/tasks/attivi')
+    tuttiTask.value = r.data
+  } catch (e) { console.error(e) }
+}
 
 // Solo i dipendenti con turno aperto (fonte di verità: TurniDip)
 const fetchDipendenti = async () => {
@@ -49,12 +55,14 @@ onMounted(() => {
 })
 
 // ==========================================
-// STATISTICHE
+// STATISTICHE E FILTRI
 // ==========================================
 const taskDaFare    = computed(() => tuttiTask.value.filter(t => t.statoTask === 'DA_FARE').length)
 const taskInCarico  = computed(() => tuttiTask.value.filter(t => t.statoTask === 'IN_CARICO').length)
 const taskCompletati = computed(() => tuttiTask.value.filter(t => t.statoTask === 'COMPLETATO').length)
 
+// NUOVA COMPUTED: Filtra la lista principale per nascondere i completati
+const taskAttiviLista = computed(() => tuttiTask.value.filter(t => t.statoTask !== 'COMPLETATO'))
 // ==========================================
 // MODALE
 // ==========================================
@@ -151,11 +159,9 @@ const getStatoClass = (stato) => {
 
         <div class="card table-card">
           <div class="card-header">
-            <h3>Tutti i Task</h3>
-            <span class="badge">{{ tuttiTask.length }} task</span>
-          </div>
+            <h3>Task Attivi</h3> <span class="badge">{{ taskAttiviLista.length }} task in corso</span> </div>
 
-          <div class="table-responsive" v-if="tuttiTask.length > 0">
+          <div class="table-responsive" v-if="taskAttiviLista.length > 0">
             <table class="modern-table">
               <thead>
               <tr>
@@ -163,7 +169,7 @@ const getStatoClass = (stato) => {
               </tr>
               </thead>
               <tbody>
-              <tr v-for="task in tuttiTask" :key="task.id">
+              <tr v-for="task in taskAttiviLista" :key="task.id">
                 <td class="id-cell">#TSK-{{ task.id }}</td>
                 <td class="desc-cell">{{ task.descrizione }}</td>
                 <td>
@@ -191,7 +197,7 @@ const getStatoClass = (stato) => {
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
             </svg>
-            <p>Nessun task presente. Creane uno con il pulsante "Nuovo Task".</p>
+            <p>Nessun task attivo presente. Creane uno con il pulsante "Nuovo Task".</p>
           </div>
         </div>
 

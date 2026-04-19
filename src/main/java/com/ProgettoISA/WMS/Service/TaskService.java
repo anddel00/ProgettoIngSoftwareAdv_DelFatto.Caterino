@@ -32,22 +32,19 @@ public class TaskService {
     // ==========================================
     @Transactional
     public TaskDTO creaEAssegna(CreaTaskDTO dto) {
-        // --- NUOVA VALIDAZIONE DI SICUREZZA ---
         if (dto.getQuantita() <= 0) {
             throw new IllegalArgumentException("Errore di sicurezza: La quantità deve essere maggiore di zero.");
         }
-        // 1. Verifichiamo che il dipendente esista
+
         Utenti dipendente = utentiRepository.findByEmail(dto.getEmailDipendente())
                 .orElseThrow(() -> new IllegalArgumentException(
                         "Nessun dipendente trovato con email: " + dto.getEmailDipendente()));
 
-        // 2. Creiamo il Task
         Task nuovoTask = new Task();
         nuovoTask.setDescrizione(dto.getDescrizione());
         nuovoTask.setTipo_task(dto.getTipoTask());
         nuovoTask.setQta_spostata(dto.getQuantita());
-        nuovoTask.setStato_task("DA_FARE"); // Stato iniziale sempre DA_FARE
-        // Campi posizione opzionali (possono essere 0 se non definiti)
+        nuovoTask.setStato_task("DA_FARE");
         nuovoTask.setVecchia_x(dto.getVecchiaX());
         nuovoTask.setVecchia_y(dto.getVecchiaY());
         nuovoTask.setNuova_x(dto.getNuovaX());
@@ -55,11 +52,9 @@ public class TaskService {
 
         Task taskSalvato = taskRepository.save(nuovoTask);
 
-        // 3. Creiamo il collegamento Task <-> Dipendente
         TaskDip assegnazione = new TaskDip(dipendente, taskSalvato);
         taskDipRepository.save(assegnazione);
 
-        // 4. Restituiamo il DTO al controller
         return new TaskDTO(
                 taskSalvato.getId(),
                 taskSalvato.getDescrizione(),
@@ -70,26 +65,38 @@ public class TaskService {
     }
 
     // ==========================================
-    // 2. OTTIENI TUTTI I TASK (per la dashboard admin)
+    // --- HELPER PRIVATO PER MAPPARE I DTO ---
+    // ==========================================
+    private TaskDTO convertiInDTO(TaskDip td) {
+        Task t = td.getTask();
+        Utenti dipendente = td.getDipendente();
+        String nomeCompleto = dipendente.getNome() + " " + dipendente.getCognome();
+
+        return new TaskDTO(
+                t.getId(),
+                t.getDescrizione(),
+                t.getTipo_task(),
+                t.getStato_task(),
+                t.getQta_spostata(),
+                nomeCompleto
+        );
+    }
+
+    // ==========================================
+    // 2A. OTTIENI SOLO I TASK ATTIVI (Per GestioneTask.vue)
+    // ==========================================
+    public List<TaskDTO> getTaskAttiviAdmin() {
+        return taskDipRepository.findTaskAttivi().stream()
+                .map(this::convertiInDTO) // Usa l'helper!
+                .collect(Collectors.toList());
+    }
+
+    // ==========================================
+    // 2B. OTTIENI TUTTI I TASK (Per StoricoAdmin.vue)
     // ==========================================
     public List<TaskDTO> getTuttiTask() {
-        // Leggiamo da TaskDip, che contiene sia il Task che l'Utente!
         return taskDipRepository.findAll().stream()
-                .map(td -> {
-                    Task t = td.getTask();
-                    Utenti dipendente = td.getDipendente();
-                    String nomeCompleto = dipendente.getNome() + " " + dipendente.getCognome();
-
-                    // Usiamo il nuovo costruttore che include il nome!
-                    return new TaskDTO(
-                            t.getId(),
-                            t.getDescrizione(),
-                            t.getTipo_task(),
-                            t.getStato_task(),
-                            t.getQta_spostata(),
-                            nomeCompleto
-                    );
-                })
+                .map(this::convertiInDTO) // Usa l'helper!
                 .collect(Collectors.toList());
     }
 
@@ -97,13 +104,10 @@ public class TaskService {
     // 3. OTTIENI I TASK DI UN DIPENDENTE (per la homepage dipendente)
     // ==========================================
     public List<TaskDTO> getTaskPerDipendente(String email) {
-        return taskRepository.findTasksByDipendenteEmail(email).stream()
-                .map(t -> new TaskDTO(
-                        t.getId(),
-                        t.getDescrizione(),
-                        t.getTipo_task(),
-                        t.getStato_task(),
-                        t.getQta_spostata()))
+        // Leggiamo da TaskDip, filtrando per l'email del dipendente
+        return taskDipRepository.findAll().stream()
+                .filter(td -> td.getDipendente().getEmail().equals(email))
+                .map(this::convertiInDTO) // Usiamo di nuovo il nostro fantastico helper!
                 .collect(Collectors.toList());
     }
 
