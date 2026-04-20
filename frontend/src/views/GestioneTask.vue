@@ -68,28 +68,26 @@ const taskCompletati = computed(() => tuttiTask.value.filter(t => t.statoTask ==
 // --- RICERCA LATO CLIENT ---
 const searchQuery = ref('')
 
-// NUOVA COMPUTED: Filtra i non completati E applica la ricerca
-const taskAttiviLista = computed(() => {
-  // 1. Prima prendiamo solo i task attivi
-  let attivi = tuttiTask.value.filter(t => t.statoTask !== 'COMPLETATO');
+const filtroTipo = ref('TUTTI'); // Stato iniziale
 
-  // 2. Se la barra di ricerca è vuota, li ritorniamo tutti
-  if (!searchQuery.value) {
-    return attivi;
-  }
+// Assicurati di avere questa riga per definire la lista che stai filtrando
+const taskAttiviLista = computed(() => tuttiTask.value.filter(t => t.statoTask !== 'COMPLETATO'));
 
-  // 3. Altrimenti filtriamo in base al testo (ID, Descrizione, Operatore, Stato)
+// E poi il calcolo che avevamo preparato
+const taskFiltrati = computed(() => {
   const q = searchQuery.value.toLowerCase();
+  // Qui filtriamo taskAttiviLista
+  return taskAttiviLista.value.filter(task => {
+    const matchesTipo = filtroTipo.value === 'TUTTI' || task.tipoTask === filtroTipo.value;
+    const matchesQuery = task.id.toString().includes(q) ||
+        task.descrizione.toLowerCase().includes(q) ||
+        task.statoTask.toLowerCase().includes(q) ||
+        (task.nomeDipendente && task.nomeDipendente.toLowerCase().includes(q));
 
-  return attivi.filter(task => {
-    const idMatch = task.id ? task.id.toString().includes(q) : false;
-    const descMatch = task.descrizione ? task.descrizione.toLowerCase().includes(q) : false;
-    const operatoreMatch = task.nomeDipendente ? task.nomeDipendente.toLowerCase().includes(q) : false;
-    const statoMatch = task.statoTask ? task.statoTask.replace('_', ' ').toLowerCase().includes(q) : false;
-
-    return idMatch || descMatch || operatoreMatch || statoMatch;
+    return matchesTipo && matchesQuery;
   });
-})
+});
+
 
 // ==========================================
 // MODALE E AZIONI
@@ -182,28 +180,38 @@ const getStatoClass = (stato) => {
         </div>
 
         <div class="card table-card">
-          <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding: 20px 24px;">
-            <div style="display: flex; align-items: center; gap: 16px;">
+          <div class="card-header">
+            <div class="header-section left">
               <h3>Task Attivi</h3>
-              <span class="badge">{{ taskAttiviLista.length }} risultati</span>
+              <span class="badge">{{ taskFiltrati.length }} risultati</span>
             </div>
 
-            <div class="search-container" style="position: relative; width: 280px;">
-              <svg style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: #94a3b8;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-              </svg>
-              <input
-                  type="text"
-                  v-model="searchQuery"
-                  placeholder="Cerca per ID, Operatore, Stato..."
-                  style="width: 100%; box-sizing: border-box; padding: 10px 12px 10px 40px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 14px; outline: none; transition: all 0.2s; box-shadow: inset 0 1px 2px rgba(0,0,0,0.02);"
-                  onfocus="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 0 0 3px rgba(59, 130, 246, 0.1)';"
-                  onblur="this.style.borderColor='#cbd5e1'; this.style.boxShadow='inset 0 1px 2px rgba(0,0,0,0.02)';"
-              />
+            <div class="header-section center">
+              <div class="filter-group">
+                <button v-for="tipo in ['TUTTI', 'PRELIEVO', 'SPOSTAMENTO', 'DEPOSITO']"
+                        :key="tipo"
+                        @click="filtroTipo = tipo"
+                        :disabled="filtroTipo === tipo"
+                        :class="['filter-btn', { 'active': filtroTipo === tipo }]">
+                  {{ tipo }}
+                </button>
+              </div>
+            </div>
+
+            <div class="header-section right">
+              <div class="search-wrapper">
+                <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+                <input type="text"
+                       v-model="searchQuery"
+                       class="search-input"
+                       placeholder="Cerca task..." />
+              </div>
             </div>
           </div>
 
-          <div class="table-responsive" v-if="taskAttiviLista.length > 0">
+          <div class="table-responsive" v-if="taskFiltrati.length > 0">
             <table class="modern-table">
               <thead>
               <tr>
@@ -211,7 +219,7 @@ const getStatoClass = (stato) => {
               </tr>
               </thead>
               <tbody>
-              <tr v-for="task in taskAttiviLista" :key="task.id">
+              <tr v-for="task in taskFiltrati" :key="task.id">
                 <td class="id-cell">#TSK-{{ task.id }}</td>
                 <td class="desc-cell">{{ task.descrizione }}</td>
                 <td>
@@ -329,7 +337,6 @@ const getStatoClass = (stato) => {
 .stat-title { font-size: 13px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
 .stat-value { margin: 12px 0 0 0; font-size: 32px; font-weight: 700; color: #0f172a; }
 .card { background: #fff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; }
-.card-header { padding: 24px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #f8fafc; }
 .card-header h3 { margin: 0; font-size: 18px; color: #0f172a; }
 .badge { background: #e0e7ff; color: #4f46e5; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: 600; }
 .table-responsive { width: 100%; overflow-x: auto; }
@@ -376,4 +383,70 @@ const getStatoClass = (stato) => {
 .btn-success { background: #10b981; color: white; border: none; padding: 10px 24px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; transition: background 0.2s; }
 .btn-success:hover:not(:disabled) { background: #059669; }
 .btn-success:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Layout a 3 Zone per l'header */
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e2e8f0;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.header-section {
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.left { justify-content: flex-start; }
+.center { justify-content: center; }
+.right { justify-content: flex-end; }
+
+/* Barra Ricerca */
+.search-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 250px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 10px 12px 10px 40px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  font-size: 13px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  color: #94a3b8;
+}
+
+/* Filtri - Riusiamo quelli di StoricoMovimenti */
+.filter-group { display: flex; gap: 8px; }
+.filter-btn {
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.filter-btn:not(.active):hover { background: #f1f5f9; }
+.filter-btn.active { background: #6366f1; color: white; border-color: #6366f1; }
+.filter-btn:disabled { cursor: default; opacity: 1; }
 </style>

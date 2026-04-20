@@ -50,26 +50,24 @@ watch(ultimoTaskRicevuto, (nuovoTask) => {
 // BARRA DI RICERCA
 const searchQuery = ref('')
 
-// La lista filtrata "in tempo reale"
-const storicoFiltrato = computed(() => {
-  if (!searchQuery.value) {
-    return storico.value
-  }
+// logica per bottoni filtro
+const filtroTipo = ref('TUTTI')
 
+const storicoFiltrato = computed(() => {
   const q = searchQuery.value.toLowerCase()
 
-  // Filtra sui campi esatti che stampiamo nella tabella
   return storico.value.filter(record => {
-    // Assicuriamoci che i campi esistano prima di chiamare toString/toLowerCase
-    const idValido = record.idTask || record.id || '';
-    const descValida = record.descrizione || '';
-    const nomeValido = record.nomeDipendente || '';
+    // 1. Logica Categoria (Se è 'TUTTI' passa tutto, altrimenti filtra)
+    const matchesTipo = filtroTipo.value === 'TUTTI' || record.tipoTask === filtroTipo.value
 
-    const idMatch = idValido.toString().includes(q)
-    const descMatch = descValida.toLowerCase().includes(q)
-    const opMatch = nomeValido.toLowerCase().includes(q) // Ricerca anche per nome operatore!
+    // 2. Logica Ricerca Testuale per barra di ricerca
+    const idValido = (record.idTask || record.id || '').toString().toLowerCase();
+    const descValida = (record.descrizione || '').toLowerCase();
+    const nomeValido = (record.nomeDipendente || '').toLowerCase();
 
-    return idMatch || descMatch || opMatch
+    const matchesQuery = idValido.includes(q) || descValida.includes(q) || nomeValido.includes(q)
+
+    return matchesTipo && matchesQuery
   })
 })
 
@@ -97,27 +95,35 @@ onMounted(() => {
       <div class="content-area">
 
         <div class="card table-card">
-          <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding: 20px 24px;">
-
-            <div style="display: flex; align-items: center; gap: 16px;">
+          <div class="card-header">
+            <div class="header-section left">
               <h3>Task Completati</h3>
               <span class="badge">{{ storicoFiltrato.length }} Registri</span>
             </div>
 
-            <div class="search-container" style="position: relative; width: 280px;">
-              <svg style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: #94a3b8;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-              </svg>
-              <input
-                  type="text"
-                  v-model="searchQuery"
-                  placeholder="Cerca per ID, Operatore, Oggetto..."
-                  style="width: 100%; box-sizing: border-box; padding: 10px 12px 10px 40px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 14px; outline: none; transition: all 0.2s; box-shadow: inset 0 1px 2px rgba(0,0,0,0.02);"
-                  onfocus="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 0 0 3px rgba(59, 130, 246, 0.1)';"
-                  onblur="this.style.borderColor='#cbd5e1'; this.style.boxShadow='inset 0 1px 2px rgba(0,0,0,0.02)';"
-              />
+            <div class="header-section center">
+              <div class="filter-group">
+                <button v-for="tipo in ['TUTTI', 'PRELIEVO', 'SPOSTAMENTO', 'DEPOSITO']"
+                        :key="tipo"
+                        @click="filtroTipo = tipo"
+                        :disabled="filtroTipo === tipo"
+                        :class="['filter-btn', { 'active': filtroTipo === tipo }]">
+                  {{ tipo }}
+                </button>
+              </div>
             </div>
 
+            <div class="header-section right">
+              <div class="search-wrapper">
+                <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+                <input type="text"
+                       v-model="searchQuery"
+                       class="search-input"
+                       placeholder="Cerca task..." />
+              </div>
+            </div>
           </div>
 
           <div class="table-responsive" v-if="storicoFiltrato.length > 0">
@@ -195,7 +201,90 @@ onMounted(() => {
 
 /* Stili Tabella */
 .card { background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02); overflow: hidden; }
-.card-header { padding: 24px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background-color: #f8fafc; }
+/* Intestazione della Card */
+/* Intestazione della Card */
+/* Intestazione della Card - Layout a 3 Zone */
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e2e8f0;
+  gap: 16px;
+  flex-wrap: wrap; /* Va a capo solo se lo schermo è davvero stretto */
+}
+
+.header-section {
+  display: flex;
+  align-items: center;
+  flex: 1; /* Dividiamo lo spazio in 3 parti uguali */
+}
+
+.left { justify-content: flex-start; }
+.center { justify-content: center; }
+.right { justify-content: flex-end; }
+
+/* Barra Ricerca */
+.search-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 250px; /* Limita la larghezza per non tagliare */
+}
+
+.search-input {
+  width: 100%;
+  padding: 10px 12px 10px 40px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  font-size: 13px;
+  outline: none;
+  box-sizing: border-box; /* Fondamentale: impedisce al padding di rompere la larghezza */
+}
+
+.search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  color: #94a3b8;
+}
+
+/* Filtri */
+.filter-group {
+  display: flex;
+  gap: 8px;
+}
+
+.filter-btn {
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+/* L'hover scatta solo se non è attivo */
+.filter-btn:not(.active):hover {
+  background: #f1f5f9;
+}
+
+.filter-btn.active {
+  background: #6366f1;
+  color: white;
+  border-color: #6366f1;
+}
+
+.filter-btn:disabled {
+  cursor: default;
+  opacity: 1;
+}
 .card-header h3 { margin: 0; font-size: 18px; color: #0f172a; }
 .badge { background: #e0e7ff; color: #4f46e5; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: 600; }
 
@@ -222,4 +311,5 @@ onMounted(() => {
 
 .empty-state-modern { padding: 60px 0; color: #94a3b8; text-align: center; font-size: 15px; display: flex; flex-direction: column; align-items: center; }
 .empty-state-modern svg { width: 48px; height: 48px; margin-bottom: 16px; opacity: 0.5; }
+
 </style>
