@@ -1,12 +1,8 @@
 package com.ProgettoISA.WMS.Model;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
+
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "\"TURNIDIP\"")
@@ -22,6 +18,17 @@ public class TurniDip {
     @ManyToOne
     @JoinColumn(name = "\"Id_Turno\"")
     private Turni turno;
+
+    // --- NUOVI CAMPI PER LA LOGICA DEI TURNI ---
+    @Column
+            (name = "\"OraInizioReale\"")
+    private LocalDateTime oraInizioReale;
+
+    @Column(name = "\"OraFineReale\"")
+    private LocalDateTime oraFineReale;
+
+    public TurniDip() {
+    }
 
 
     public TurniDip(Utenti dipendente, Turni turno) {
@@ -52,4 +59,22 @@ public class TurniDip {
     public void setTurno(Turni turno) {
         this.turno = turno;
     }
+
+    public LocalDateTime getOraInizioReale() {
+        return oraInizioReale;
+    }
+
+    public void setOraInizioReale(LocalDateTime oraInizioReale) {
+        this.oraInizioReale = oraInizioReale;
+    }
+
+    public LocalDateTime getOraFineReale() {
+        return oraFineReale;
+    }
+
+    public void setOraFineReale(LocalDateTime oraFineReale) {
+        this.oraFineReale = oraFineReale;
+    }
+
+
 }

@@ -1,17 +1,22 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue' // --- NUOVO: Aggiunto 'watch'
 import { useRouter } from 'vue-router'
-import api from '../api' // Usando la tua configurazione Axios personalizzata!
+import api from '../api'
+import { useWmsWebSocket } from '../composables/useWmsWebSocket' // --- NUOVO: Importiamo il nostro "Cervello"
 
 const router = useRouter()
-const nomeUtente = ref(localStorage.getItem('nomeUtente') || 'Operatore')
-const emailUtente = ref(localStorage.getItem('email') || 'dipendente@wms.it')
+const nomeUtente = ref(sessionStorage.getItem('nomeUtente') || 'Operatore')
+const emailUtente = ref(sessionStorage.getItem('emailUtente') || 'dipendente@wms.it')
+const ruoloUtente = ref(sessionStorage.getItem('ruolo') || 'Dipendente') // --- NUOVO: Serve per la connessione
+
+// --- NUOVO: Estraiamo metodi e stato dal composable
+const { connectWebSocket, ultimoTaskRicevuto } = useWmsWebSocket()
 
 const isTurnoAttivo = ref(false)
 const taskAssegnati = ref([])
 
 const logout = () => {
-  localStorage.clear()
+  sessionStorage.clear()
   router.push('/')
 }
 
@@ -25,23 +30,89 @@ const fetchTasks = async () => {
   }
 }
 
-// Quando clicca "Inizia Turno", scarichiamo i task veri
-const toggleTurno = () => {
-  isTurnoAttivo.value = !isTurnoAttivo.value
-  if (isTurnoAttivo.value) {
-    fetchTasks()
+// --- NUOVO: OSSERVIAMO IL WEBSOCKET ---
+// Questa è la magia. Se l'Admin assegna un task mentre il dipendente
+// ha la schermata Home aperta, la lista si aggiorna da sola!
+watch(ultimoTaskRicevuto, (nuovoTask) => {
+  if (nuovoTask && isTurnoAttivo.value) {
+    const index = taskAssegnati.value.findIndex(t => t.id === nuovoTask.id)
+
+    // Se il task viene completato, lo rimuoviamo dalla vista
+    if (nuovoTask.statoTask === 'COMPLETATO') {
+      if (index !== -1) {
+        taskAssegnati.value.splice(index, 1)
+        taskAssegnati.value = [...taskAssegnati.value]
+      }
+    } else {
+      // Altrimenti lo aggiorniamo o lo aggiungiamo in cima
+      if (index !== -1) {
+        taskAssegnati.value[index] = nuovoTask
+        taskAssegnati.value = [...taskAssegnati.value]
+      } else {
+        taskAssegnati.value = [nuovoTask, ...taskAssegnati.value]
+      }
+    }
+  }
+})
+
+// Quando clicca il bottone, gestiamo Inizio o Fine turno
+const toggleTurno = async () => {
+  if (!isTurnoAttivo.value) {
+    // --- INIZIO TURNO ---
+    try {
+      const response = await api.post('/api/turni/inizia', { email: emailUtente.value });
+      isTurnoAttivo.value = true;
+      fetchTasks();
+      console.log(response.data.message);
+    } catch (error) {
+      if (error.response && error.response.data) alert(error.response.data.message);
+      else alert("Errore di connessione al server durante l'inizio del turno.");
+    }
+  } else {
+    // --- FINE TURNO ---
+    try {
+      const response = await api.post('/api/turni/termina', { email: emailUtente.value });
+      isTurnoAttivo.value = false;
+      taskAssegnati.value = [];
+      alert(response.data.message || "Turno terminato. Buon riposo!");
+    } catch (error) {
+      if (error.response && error.response.data) alert(error.response.data.message);
+      else {
+        console.error("Errore fine turno:", error);
+        alert("Errore di connessione al server durante la fine del turno.");
+      }
+    }
   }
 }
+
+// ==========================================
+// CONTROLLO STATO TURNO AL CARICAMENTO
+// ==========================================
+onMounted(async () => {
+  try {
+    const response = await api.get('/api/turni/attivi');
+    const dipendentiInTurno = response.data;
+    const hoUnTurnoAttivo = dipendentiInTurno.find(dip => dip.email === emailUtente.value);
+
+    if (hoUnTurnoAttivo) {
+      isTurnoAttivo.value = true;
+      fetchTasks();
+    }
+
+    // --- Avviamo la connessione globale ---
+    connectWebSocket(emailUtente.value, ruoloUtente.value)
+
+  } catch (error) {
+    console.error("Errore nel controllo dello stato del turno:", error);
+  }
+})
 
 // Funzione per cambiare lo stato del task cliccando i bottoni
 const aggiornaStatoTask = async (task, nuovoStato) => {
   try {
     await api.patch(`/api/tasks/${task.id}/stato?nuovoStato=${nuovoStato}`)
-
-    // Aggiorniamo la UI localmente
+    // Aggiorniamo la UI localmente (il WebSocket informerà l'Admin!)
     task.statoTask = nuovoStato
-
-    // Se lo abbiamo completato, lo togliamo dalla vista della Home
     if (nuovoStato === 'COMPLETATO') {
       taskAssegnati.value = taskAssegnati.value.filter(t => t.id !== task.id)
     }

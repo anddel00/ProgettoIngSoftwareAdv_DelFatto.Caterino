@@ -2,7 +2,9 @@ package com.ProgettoISA.WMS.Controller;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
+import com.ProgettoISA.WMS.Repository.TurniDipRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -98,6 +100,22 @@ public class UtentiController {
     @GetMapping("/utenti")
     public ResponseEntity<List<Utenti>> getTuttiUtenti() {
         return ResponseEntity.ok(utentiService.ottieniTuttiUtenti());
+    }
+
+    @Autowired
+    private TurniDipRepository turniDipRepository;
+
+    @GetMapping("/utenti/attivi")
+    public ResponseEntity<List<UtentiDTO>> getDipendentiAttivi() {
+        // 1. Peschiamo i dipendenti "online" tramite la nostra query
+        List<Utenti> dipendentiAttivi = turniDipRepository.findDipendentiAttualmenteInTurno();
+
+        // 2. Li convertiamo in DTO per non esporre dati sensibili (password, ecc.)
+        List<UtentiDTO> response = dipendentiAttivi.stream()
+                .map(utente -> new UtentiDTO(utente.getId(), utente.getNome(), utente.getCognome(), utente.getEmail(), utente.getRuolo().getNomeRuolo()))
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(response);
     }
 
 

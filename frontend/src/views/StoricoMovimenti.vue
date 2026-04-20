@@ -1,29 +1,75 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch , computed } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../api'
-
 import AdminSidebar from '../components/AdminSidebar.vue'
-
+import { useWmsWebSocket } from '../composables/useWmsWebSocket.js'
 
 const router = useRouter()
-const nomeUtente = ref(localStorage.getItem('nomeUtente') || 'Admin')
+const nomeUtente = ref(sessionStorage.getItem('nomeUtente') || 'Admin')
 const storico = ref([])
 
+const { ultimoTaskRicevuto } = useWmsWebSocket()
+
 const logout = () => {
-  localStorage.clear()
+  sessionStorage.clear()
   router.push('/')
 }
 
 const fetchStorico = async () => {
   try {
     const response = await api.get('/api/tasks/storico-admin')
-    // Invertiamo l'array così i task più recenti (con ID più alto) appaiono in cima
     storico.value = response.data.reverse()
   } catch (error) {
     console.error("Errore nel recupero dello storico:", error)
   }
 }
+
+// OSSERVIAMO IL WEBSOCKET
+watch(ultimoTaskRicevuto, (nuovoTask) => {
+  if (nuovoTask && nuovoTask.statoTask === 'COMPLETATO') {
+    // Nota: il WebSocket manda un TaskDTO standard (con .id invece di .idTask)
+    // Adattiamo la logica per assicurarci che combaci con lo storico
+    const idDaCercare = nuovoTask.id || nuovoTask.idTask;
+    const esisteGia = storico.value.some(t => t.idTask === idDaCercare || t.id === idDaCercare)
+
+    if (!esisteGia) {
+      // Formattiamo il nuovo task come se fosse arrivato dall'API dello storico
+      const taskStorico = {
+        idTask: nuovoTask.id,
+        nomeDipendente: nuovoTask.nomeDipendente || 'Operatore',
+        tipoTask: nuovoTask.tipoTask,
+        descrizione: nuovoTask.descrizione,
+        quantita: nuovoTask.quantita || nuovoTask.qtaSpostata
+      }
+      storico.value = [taskStorico, ...storico.value]
+    }
+  }
+})
+
+// BARRA DI RICERCA
+const searchQuery = ref('')
+
+// logica per bottoni filtro
+const filtroTipo = ref('TUTTI')
+
+const storicoFiltrato = computed(() => {
+  const q = searchQuery.value.toLowerCase()
+
+  return storico.value.filter(record => {
+    // 1. Logica Categoria (Se è 'TUTTI' passa tutto, altrimenti filtra)
+    const matchesTipo = filtroTipo.value === 'TUTTI' || record.tipoTask === filtroTipo.value
+
+    // 2. Logica Ricerca Testuale per barra di ricerca
+    const idValido = (record.idTask || record.id || '').toString().toLowerCase();
+    const descValida = (record.descrizione || '').toLowerCase();
+    const nomeValido = (record.nomeDipendente || '').toLowerCase();
+
+    const matchesQuery = idValido.includes(q) || descValida.includes(q) || nomeValido.includes(q)
+
+    return matchesTipo && matchesQuery
+  })
+})
 
 onMounted(() => {
   fetchStorico()
@@ -32,7 +78,6 @@ onMounted(() => {
 
 <template>
   <div class="dashboard-layout">
-
     <AdminSidebar />
 
     <main class="main-content">
@@ -51,11 +96,37 @@ onMounted(() => {
 
         <div class="card table-card">
           <div class="card-header">
-            <h3>Task Completati</h3>
-            <span class="badge">{{ storico.length }} Registri</span>
+            <div class="header-section left">
+              <h3>Task Completati</h3>
+              <span class="badge">{{ storicoFiltrato.length }} Registri</span>
+            </div>
+
+            <div class="header-section center">
+              <div class="filter-group">
+                <button v-for="tipo in ['TUTTI', 'PRELIEVO', 'SPOSTAMENTO', 'DEPOSITO']"
+                        :key="tipo"
+                        @click="filtroTipo = tipo"
+                        :disabled="filtroTipo === tipo"
+                        :class="['filter-btn', { 'active': filtroTipo === tipo }]">
+                  {{ tipo }}
+                </button>
+              </div>
+            </div>
+
+            <div class="header-section right">
+              <div class="search-wrapper">
+                <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+                <input type="text"
+                       v-model="searchQuery"
+                       class="search-input"
+                       placeholder="Cerca task..." />
+              </div>
+            </div>
           </div>
 
-          <div class="table-responsive" v-if="storico.length > 0">
+          <div class="table-responsive" v-if="storicoFiltrato.length > 0">
             <table class="modern-table">
               <thead>
               <tr>
@@ -68,11 +139,11 @@ onMounted(() => {
               </tr>
               </thead>
               <tbody>
-              <tr v-for="record in storico" :key="record.idTask">
-                <td class="id-cell">#TSK-{{ record.idTask }}</td>
+              <tr v-for="record in storicoFiltrato" :key="record.idTask || record.id">
+                <td class="id-cell">#TSK-{{ record.idTask || record.id }}</td>
                 <td class="user-cell">
-                  <div class="user-avatar-small">{{ record.nomeDipendente.charAt(0) }}</div>
-                  <strong>{{ record.nomeDipendente }}</strong>
+                  <div class="user-avatar-small">{{ record.nomeDipendente ? record.nomeDipendente.charAt(0) : 'O' }}</div>
+                  <strong>{{ record.nomeDipendente || 'Operatore' }}</strong>
                 </td>
                 <td>
                     <span class="task-type" :class="record.tipoTask === 'PRELIEVO' ? 'pickup' : 'dropoff'">
@@ -80,7 +151,7 @@ onMounted(() => {
                     </span>
                 </td>
                 <td class="desc-cell">{{ record.descrizione }}</td>
-                <td><strong>{{ record.quantita }}</strong></td>
+                <td><strong>{{ record.quantita || record.qtaSpostata }}</strong></td>
                 <td><span class="status-badge-success">Completato</span></td>
               </tr>
               </tbody>
@@ -89,7 +160,8 @@ onMounted(() => {
 
           <div v-else class="empty-state-modern">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
-            <p>Il registro storico è vuoto. Nessun task completato al momento.</p>
+            <p v-if="searchQuery">Nessun risultato trovato per "<strong>{{ searchQuery }}</strong>"</p>
+            <p v-else>Il registro storico è vuoto. Nessun task completato al momento.</p>
           </div>
         </div>
 
@@ -129,7 +201,90 @@ onMounted(() => {
 
 /* Stili Tabella */
 .card { background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02); overflow: hidden; }
-.card-header { padding: 24px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background-color: #f8fafc; }
+/* Intestazione della Card */
+/* Intestazione della Card */
+/* Intestazione della Card - Layout a 3 Zone */
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e2e8f0;
+  gap: 16px;
+  flex-wrap: wrap; /* Va a capo solo se lo schermo è davvero stretto */
+}
+
+.header-section {
+  display: flex;
+  align-items: center;
+  flex: 1; /* Dividiamo lo spazio in 3 parti uguali */
+}
+
+.left { justify-content: flex-start; }
+.center { justify-content: center; }
+.right { justify-content: flex-end; }
+
+/* Barra Ricerca */
+.search-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 250px; /* Limita la larghezza per non tagliare */
+}
+
+.search-input {
+  width: 100%;
+  padding: 10px 12px 10px 40px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  font-size: 13px;
+  outline: none;
+  box-sizing: border-box; /* Fondamentale: impedisce al padding di rompere la larghezza */
+}
+
+.search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  color: #94a3b8;
+}
+
+/* Filtri */
+.filter-group {
+  display: flex;
+  gap: 8px;
+}
+
+.filter-btn {
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+/* L'hover scatta solo se non è attivo */
+.filter-btn:not(.active):hover {
+  background: #f1f5f9;
+}
+
+.filter-btn.active {
+  background: #6366f1;
+  color: white;
+  border-color: #6366f1;
+}
+
+.filter-btn:disabled {
+  cursor: default;
+  opacity: 1;
+}
 .card-header h3 { margin: 0; font-size: 18px; color: #0f172a; }
 .badge { background: #e0e7ff; color: #4f46e5; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: 600; }
 
@@ -156,4 +311,5 @@ onMounted(() => {
 
 .empty-state-modern { padding: 60px 0; color: #94a3b8; text-align: center; font-size: 15px; display: flex; flex-direction: column; align-items: center; }
 .empty-state-modern svg { width: 48px; height: 48px; margin-bottom: 16px; opacity: 0.5; }
+
 </style>
