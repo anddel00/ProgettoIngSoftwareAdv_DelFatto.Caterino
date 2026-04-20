@@ -16,7 +16,7 @@ public class Mappa {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "\"Id\"", nullable = false)
-    private Integer id;
+    private long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "\"Id_Reparto\"", nullable = false)
@@ -27,22 +27,22 @@ public class Mappa {
     private Scaffali scaffale;
 
     @Column(name = "\"X\"", nullable = false)
-    private Integer x;
+    private int x;
 
     @Column(name = "\"Y\"", nullable = false)
-    private Integer y;
+    private int y;
 
     public Mappa() {
     }
 
-    public Mappa(Reparti reparto, Scaffali scaffale, Integer x, Integer y) {
+    public Mappa(Reparti reparto, Scaffali scaffale, int x, int y) {
         this.reparto = reparto;
         this.scaffale = scaffale;
         this.x = x;
         this.y = y;
     }
 
-    public Integer getId() {
+    public long getId() {
         return id;
     }
 
@@ -66,19 +66,19 @@ public class Mappa {
         this.scaffale = scaffale;
     }
 
-    public Integer getX() {
+    public int getX() {
         return x;
     }
 
-    public void setX(Integer x) {
+    public void setX(int x) {
         this.x = x;
     }
 
-    public Integer getY() {
+    public int getY() {
         return y;
     }
 
-    public void setY(Integer y) {
+    public void setY(int y) {
         this.y = y;
     }
 
