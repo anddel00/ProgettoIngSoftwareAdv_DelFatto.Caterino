@@ -79,9 +79,11 @@ public class TurniController {
                 .map(u -> new UtentiDTO(
                         u.getId(),
                         u.getNome(),
+                        u.getUsername(),
                         u.getCognome(),
                         u.getEmail(),
-                        u.getRuolo().getNomeRuolo()))
+                        u.getRuolo().getNomeRuolo(),
+                        u.getData_nascita()))
                 .collect(Collectors.toList());
         return ResponseEntity.ok(result);
     }

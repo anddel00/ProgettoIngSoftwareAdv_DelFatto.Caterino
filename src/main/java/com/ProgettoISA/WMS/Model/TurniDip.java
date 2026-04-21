@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 public class TurniDip {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "\"Id\"") // <--- AGGIUNGI ESATTAMENTE QUESTA RIGA
     private Long id;
     
     @ManyToOne

@@ -19,6 +19,7 @@ const isPasswordUnlocked = ref(false)
 const adminPassword = ref('')
 
 const form = ref({
+  username: '',
   nome: '',
   cognome: '',
   data_nascita: '',
@@ -34,7 +35,8 @@ const form = ref({
 const caricaDipendenti = async () => {
   try {
     const response = await api.get('/api/auth/utenti')
-    dipendenti.value = response.data.filter(utente => utente.ruolo && utente.ruolo.nomeRuolo === 'Dipendente')
+    // MODIFICA QUI: ora utente.ruolo è direttamente una stringa!
+    dipendenti.value = response.data.filter(utente => utente.ruolo === 'Dipendente')
   } catch (error) {
     console.error("Errore di caricamento:", error)
   }
@@ -75,7 +77,7 @@ const apriModaleAggiungi = () => {
   errorMessage.value = ''
   staVerificandoAdmin.value = false
   isPasswordUnlocked.value = false
-  form.value = { nome: '', cognome: '', data_nascita: '', email: '', password: '', confermaPassword: '', ruolo: 'Dipendente' }
+  form.value = { nome: '', cognome: '', username: '', data_nascita: '', email: '', password: '', confermaPassword: '', ruolo: 'Dipendente' }
   mostraModale.value = true
 }
 
@@ -89,18 +91,26 @@ const apriModaleModifica = (dipendente) => {
 
   let dataFormattata = '';
   if (dipendente.data_nascita) {
-    dataFormattata = dipendente.data_nascita.split('T')[0];
+    // Creiamo una VERA data in Javascript per gestire il timestamp di Spring Boot
+    const d = new Date(dipendente.data_nascita);
+    // Formattiamola a mano in YYYY-MM-DD
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    dataFormattata = `${year}-${month}-${day}`;
   }
 
   form.value = {
     nome: dipendente.nome,
     cognome: dipendente.cognome,
     data_nascita: dataFormattata,
+    username: dipendente.username,
     email: dipendente.email,
     password: '',
     confermaPassword: '',
-    ruolo: dipendente.ruolo ? dipendente.ruolo.nomeRuolo : 'Dipendente'
+    ruolo: dipendente.ruolo || 'Dipendente'
   }
+
   mostraModale.value = true
 }
 
@@ -144,6 +154,7 @@ const salvaDipendente = async () => {
         nome: form.value.nome,
         cognome: form.value.cognome,
         data_nascita: form.value.data_nascita,
+        username: form.value.username, // AGGIUNTO QUI PER LA MODIFICA
         email: form.value.email,
         password: form.value.password
       })
@@ -152,6 +163,7 @@ const salvaDipendente = async () => {
         nome: form.value.nome,
         cognome: form.value.cognome,
         data_nascita: form.value.data_nascita,
+        username: form.value.username, // AGGIUNTO QUI PER LA REGISTRAZIONE
         email: form.value.email,
         password: form.value.password,
         ruolo: form.value.ruolo
@@ -170,7 +182,9 @@ const eliminaDipendente = async (id) => {
       await api.delete(`/api/auth/elimina/${id}`)
       caricaDipendenti()
     } catch (error) {
-      alert("Errore durante l'eliminazione.")
+      // MODIFICA QUI per vedere il vero errore!
+      alert("Errore: " + (error.response?.data || "Problema sul server"));
+      console.error(error);
     }
   }
 }
@@ -238,8 +252,8 @@ const eliminaDipendente = async (id) => {
                 <td>{{ dipendente.data_nascita ? new Date(dipendente.data_nascita).toLocaleDateString('it-IT') : '-' }}</td>
                 <td class="text-muted">{{ dipendente.email }}</td>
                 <td>
-                  <span class="badge" :class="dipendente.ruolo?.nomeRuolo === 'Admin' ? 'badge-admin' : 'badge-user'" style="background: #f1f5f9; color: #475569; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: 600;">
-                    {{ dipendente.ruolo ? dipendente.ruolo.nomeRuolo : 'Nessuno' }}
+                  <span class="badge" :class="dipendente.ruolo === 'Admin' ? 'badge-admin' : 'badge-user'" style="background: #f1f5f9; color: #475569; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: 600;">
+                    {{ dipendente.ruolo ? dipendente.ruolo : 'Nessuno' }}
                   </span>
                 </td>
                 <td class="actions-col">
@@ -291,6 +305,11 @@ const eliminaDipendente = async (id) => {
           <div class="form-group">
             <label>Data di Nascita</label>
             <input v-model="form.data_nascita" type="date" />
+          </div>
+
+          <div class="form-group">
+            <label>Username</label>
+            <input v-model="form.username" type="text" placeholder="mrossi" />
           </div>
 
           <div class="form-group">

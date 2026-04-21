@@ -38,7 +38,6 @@ public class UtentiController {
     @PostMapping("/registrati")
     public ResponseEntity<?> registraUtente(@RequestBody Map<String, Object> payload) {
         try {
-
             // 2. Costruiamo l'utente con i dati restanti del JSON
             Utenti nuovoUtente = new Utenti();
             nuovoUtente.setNome((String) payload.get("nome"));
@@ -46,23 +45,28 @@ public class UtentiController {
             nuovoUtente.setEmail((String) payload.get("email"));
             nuovoUtente.setPassword((String) payload.get("password"));
 
+            // AGGIUNGI QUESTA RIGA:
+            nuovoUtente.setUsername((String) payload.get("username"));
+
             //parsing data di nascita
             String dataStringa = (String) payload.get("data_nascita");
             if (dataStringa != null && !dataStringa.isEmpty()) {
                 nuovoUtente.setData_nascita(java.sql.Date.valueOf(dataStringa));
             }
 
-            String nomeRuolo = (String) payload.get("ruolo"); //passata come stringa perchè non abbiamo un vero e proprio campo ruolo nel DB
+            String nomeRuolo = (String) payload.get("ruolo");
 
             // 3. Passiamo tutto al Service
             Utenti utenteSalvato = utentiService.registraUtente(nuovoUtente, nomeRuolo);
             return ResponseEntity.ok(utenteSalvato);
 
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Errore nel formato dei dati inviati.");
-        }
+        }  catch (IllegalArgumentException e) {
+        e.printStackTrace(); // <--- AGGIUNGI QUESTO
+        return ResponseEntity.badRequest().body(e.getMessage());
+    } catch (Exception e) {
+        e.printStackTrace(); // <--- AGGIUNGI QUESTO
+        return ResponseEntity.badRequest().body("Errore nel formato dei dati inviati.");
+    }
     }
 
     // 2. LOGIN
@@ -80,10 +84,12 @@ public class UtentiController {
 
             UtentiDTO utenteDTO = new UtentiDTO(
                     utenteLoggato.getId(),
+                    utenteLoggato.getUsername(),
                     utenteLoggato.getNome(),
                     utenteLoggato.getCognome(),
                     utenteLoggato.getEmail(),
-                    utenteLoggato.getRuolo().getNomeRuolo() //assumendo che Ruoli abbia un campo nomeRuolo
+                    utenteLoggato.getRuolo().getNomeRuolo(),//assumendo che Ruoli abbia un campo nomeRuolo
+                    utenteLoggato.getData_nascita()
             );
             // Se tutto va bene, restituiamo i dati dell'utente in JSON
             return ResponseEntity.ok(utenteDTO);
@@ -98,8 +104,22 @@ public class UtentiController {
     // 3. ENDPOINT: OTTIENI TUTTI GLI UTENTI
     // URL: GET http://localhost:8080/api/auth/utenti
     @GetMapping("/utenti")
-    public ResponseEntity<List<Utenti>> getTuttiUtenti() {
-        return ResponseEntity.ok(utentiService.ottieniTuttiUtenti());
+    public ResponseEntity<List<UtentiDTO>> getTuttiUtenti() {
+        List<Utenti> tutti = utentiService.ottieniTuttiUtenti();
+
+        List<UtentiDTO> response = tutti.stream()
+                .map(utente -> new UtentiDTO(
+                        utente.getId(),
+                        utente.getUsername(),
+                        utente.getNome(),
+                        utente.getCognome(),
+                        utente.getEmail(),
+                        utente.getRuolo() != null ? utente.getRuolo().getNomeRuolo() : "N/A",
+                        utente.getData_nascita()
+                ))
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(response);
     }
 
     @Autowired
@@ -112,7 +132,7 @@ public class UtentiController {
 
         // 2. Li convertiamo in DTO per non esporre dati sensibili (password, ecc.)
         List<UtentiDTO> response = dipendentiAttivi.stream()
-                .map(utente -> new UtentiDTO(utente.getId(), utente.getNome(), utente.getCognome(), utente.getEmail(), utente.getRuolo().getNomeRuolo()))
+                .map(utente -> new UtentiDTO(utente.getId(),utente.getUsername(), utente.getNome(), utente.getCognome(), utente.getEmail(), utente.getRuolo().getNomeRuolo(), utente.getData_nascita()))
                 .collect(Collectors.toList());
 
         return ResponseEntity.ok(response);

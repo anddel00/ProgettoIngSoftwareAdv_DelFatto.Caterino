@@ -76,6 +76,7 @@ public class UtentiService {
                 .orElseThrow(() -> new IllegalArgumentException("Errore: Utente non trovato!"));
 
         // Aggiorniamo i dati base
+        utenteEsistente.setUsername(datiAggiornati.getUsername());
         utenteEsistente.setNome(datiAggiornati.getNome());
         utenteEsistente.setCognome(datiAggiornati.getCognome());
         utenteEsistente.setEmail(datiAggiornati.getEmail());

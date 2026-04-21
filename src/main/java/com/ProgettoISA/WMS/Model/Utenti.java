@@ -16,6 +16,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
+import jakarta.persistence.CascadeType;
 @Entity
 @Table(name = "\"UTENTI\"")
 public class Utenti {
@@ -47,16 +48,17 @@ public class Utenti {
     private Ruoli ruolo;
 
     @JsonIgnore // MAGIA: Evita il loop infinito del JSON!
-    @OneToMany(mappedBy = "dipendente")
+    @OneToMany(mappedBy = "dipendente", cascade = CascadeType.REMOVE, orphanRemoval = true)
     private List<TurniDip> turniDip = new ArrayList<>();
 
     @JsonIgnore // MAGIA: Evita il loop infinito del JSON!
-    @OneToMany(mappedBy = "dipendente")
+    @OneToMany(mappedBy = "dipendente", cascade = CascadeType.REMOVE, orphanRemoval = true)
     private List<TaskDip> taskDip = new ArrayList<>();
 
     public Utenti() {}
 
-    public Utenti(String nome, String cognome, Date data_nascita, String email, String password, Ruoli ruolo) {
+    public Utenti(String username, String nome, String cognome, Date data_nascita, String email, String password, Ruoli ruolo) {
+        this.username = username;
         this.nome = nome;
         this.cognome = cognome;
         this.data_nascita = data_nascita;
@@ -134,6 +136,8 @@ public class Utenti {
     public List<TaskDip> getTaskDip() {
         return taskDip;
     }
+
+
 
 
 
