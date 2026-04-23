@@ -165,9 +165,9 @@ public class DatabaseTestRunner implements CommandLineRunner {
     if(repartiRepository.findAll().isEmpty())
         {
             List<Reparti> repartiIniziali = List.of(
-                new Reparti(15L, 15L, -20L), // Reparto Surgelati
-                new Reparti(20L, 20L, 3L), // Reparto Freschi
-                new Reparti(30L, 30L, 15L) // Reparto Secchi
+                new Reparti(15L, 15L, -20L, "Surgelati"), // Reparto Surgelati
+                new Reparti(20L, 20L, 3L, "Fresco"), // Reparto Freschi
+                new Reparti(30L, 30L, 15L, "Secco") // Reparto Secchi
             );
 
             repartiRepository.saveAll(repartiIniziali);
@@ -192,9 +192,9 @@ public class DatabaseTestRunner implements CommandLineRunner {
                         List<Mappa> mappeIniziali = new ArrayList<>();
                         for(int i=0; i<repartiIniziali.size(); i++)
                         {
-                           mappeIniziali.add(new Mappa(repartiIniziali.get(i), scaffaliIniziali.get(0), 0, 0));
-                           mappeIniziali.add(new Mappa(repartiIniziali.get(i), scaffaliIniziali.get(1), repartiIniziali.get(i).getMaxX().intValue(), 0));
-                           mappeIniziali.add(new Mappa(repartiIniziali.get(i), scaffaliIniziali.get(2), 0, repartiIniziali.get(i).getMaxY().intValue()));
+                           mappeIniziali.add(new Mappa(repartiIniziali.get(i), scaffaliIniziali.get(0), 0, 0, "VERTICALE"));
+                           mappeIniziali.add(new Mappa(repartiIniziali.get(i), scaffaliIniziali.get(1), repartiIniziali.get(i).getMaxX().intValue()-2, 0, "VERTICALE"));
+                           mappeIniziali.add(new Mappa(repartiIniziali.get(i), scaffaliIniziali.get(2), 0, repartiIniziali.get(i).getMaxY().intValue()-5, "ORIZZONTALE"));
                            for(int j=0; j<3; j++)
                            {
                                 scaffaliIniziali.remove(0); // rimuoviamo gli scaffali già mappati per evitare duplicati
