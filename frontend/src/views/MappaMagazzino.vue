@@ -67,12 +67,20 @@
 
           <div 
             v-for="cella in getScaffaliPerReparto(reparto.id)" 
+            :key="'buffer-'+cella.id"
+            class="scaffale-buffer"
+            :class="{ 'is-editing': isEditing }"
+            :style="calcolaStileBuffer(cella, reparto)"
+          ></div>
+
+          <div 
+            v-for="cella in getScaffaliPerReparto(reparto.id)" 
             :key="cella.id"
             class="scaffale-item"
             :class="{ 
               'is-editing': isEditing, 
               'is-selected': scaffaleSelezionato?.id === cella.id,
-              'piano-inattivo': !haPiano(cella) /* NUOVA LOGICA GREY-OUT */
+              'piano-inattivo': !haPiano(cella) 
             }"
             :style="calcolaStileScaffale(cella)"
             @click="isEditing && haPiano(cella) ? selezionaScaffale(cella) : null"
@@ -125,24 +133,47 @@ const isSaving = ref(false);
 const scaffaleSelezionato = ref(null);
 let mappaOriginale = []; 
 
-// NUOVA VARIABILE STATO: Piano attualmente visualizzato
 const pianoAttuale = ref(1);
 
 const getScaffaliPerReparto = (idReparto) => mappaDati.value.filter(cella => cella.idReparto === idReparto);
 const getDatiTecniciScaffale = (idScaffale) => scaffaliDati.value.find(s => s.id === idScaffale) || null;
 
-// FUNZIONI DI VISUALIZZAZIONE
 const cambiaPiano = (delta) => {
   if (pianoAttuale.value + delta >= 1) {
     pianoAttuale.value += delta;
   }
 };
 
-// Verifica se lo scaffale ha un'altezza sufficiente per essere visibile in questo piano
 const haPiano = (cella) => {
   const info = getDatiTecniciScaffale(cella.idScaffale);
-  if (!info) return true; // Se non abbiamo dati, lo mostriamo per sicurezza
+  if (!info) return true; 
   return info.max_altezza >= pianoAttuale.value;
+};
+
+// --- NUOVO: Calcolo Area di Rispetto (Buffer Visivo) ---
+const calcolaStileBuffer = (cella, reparto) => {
+  const info = getDatiTecniciScaffale(cella.idScaffale);
+  if (!info) return { display: 'none' };
+
+  const isOrizzontale = cella.orientamentoScaffale === 'ORIZZONTALE';
+  const spanX = isOrizzontale ? info.max_righe : info.max_colonne;
+  const spanY = isOrizzontale ? info.max_colonne : info.max_righe;
+
+  // Tagliamo i bordi se lo scaffale è attaccato al muro
+  const startX = Math.max(1, cella.coordinataX); 
+  const expectedEndX = cella.coordinataX + spanX + 2; 
+  const actualEndX = Math.min(reparto.maxX + 1, expectedEndX);
+  const finalSpanX = actualEndX - startX;
+
+  const startY = Math.max(1, cella.coordinataY);
+  const expectedEndY = cella.coordinataY + spanY + 2;
+  const actualEndY = Math.min(reparto.maxY + 1, expectedEndY);
+  const finalSpanY = actualEndY - startY;
+
+  return {
+    gridColumn: `${startX} / span ${finalSpanX}`,
+    gridRow: `${startY} / span ${finalSpanY}`
+  };
 };
 
 const calcolaStileScaffale = (cella) => {
@@ -179,9 +210,7 @@ const calcolaNumeroSlot = (cella) => {
   return info ? info.max_colonne * info.max_righe : 1;
 };
 
-// FUNZIONI DI MODIFICA
 const attivaModifica = () => {
-  // Disattiviamo la visualizzazione dei piani durante la modifica per evitare errori di spostamento
   pianoAttuale.value = 1; 
   mappaOriginale = JSON.parse(JSON.stringify(mappaDati.value));
   isEditing.value = true;
@@ -222,6 +251,7 @@ const spostaScaffaleQui = (idRepartoNuovo, xNuovo, yNuovo) => {
     c => c.idReparto === idRepartoNuovo && c.id !== scaffaleSelezionato.value.id
   );
 
+  // --- NUOVO: Logica collisioni con Buffer ---
   const isSovrapposto = altriScaffali.some(altro => {
     const altroInfo = getDatiTecniciScaffale(altro.idScaffale);
     if(!altroInfo) return false;
@@ -230,18 +260,29 @@ const spostaScaffaleQui = (idRepartoNuovo, xNuovo, yNuovo) => {
     const altroSpanX = altroIsOrizzontale ? altroInfo.max_righe : altroInfo.max_colonne;
     const altroSpanY = altroIsOrizzontale ? altroInfo.max_colonne : altroInfo.max_righe;
 
+    const buffer = 1; 
+    const altroSinistra = altro.coordinataX - buffer;
+    const altroDestra = altro.coordinataX + altroSpanX + buffer;
+    const altroSopra = altro.coordinataY - buffer;
+    const altroSotto = altro.coordinataY + altroSpanY + buffer;
+
+    const nuovoSinistra = xNuovo;
+    const nuovoDestra = xNuovo + spanX;
+    const nuovoSopra = yNuovo;
+    const nuovoSotto = yNuovo + spanY;
+
     const nonSiToccano = (
-      xNuovo >= altro.coordinataX + altroSpanX || 
-      xNuovo + spanX <= altro.coordinataX ||      
-      yNuovo >= altro.coordinataY + altroSpanY || 
-      yNuovo + spanY <= altro.coordinataY         
+      nuovoSinistra >= altroDestra || 
+      nuovoDestra <= altroSinistra || 
+      nuovoSopra >= altroSotto ||     
+      nuovoSotto <= altroSopra        
     );
 
     return !nonSiToccano; 
   });
 
   if (isSovrapposto) {
-    alert("⚠️ Spostamento annullato: l'area è già occupata da un altro scaffale.");
+    alert("⚠️ Spostamento annullato: l'area di rispetto è già occupata da un altro scaffale.");
     return;
   }
 
@@ -300,15 +341,42 @@ onMounted(async () => {
 .temp-badge { background: #e1f5fe; color: #0288d1; padding: 4px 8px; border-radius: 20px; font-size: 0.8rem; font-weight: bold;}
 .griglia-dinamica { display: grid; gap: 0; background-image: linear-gradient(#e0e0e0 1px, transparent 1px), linear-gradient(90deg, #e0e0e0 1px, transparent 1px); background-size: 50px 50px; background-origin: content-box; background-color: #ffffff; border: 2px dashed #cfd8dc; padding: 10px; border-radius: 8px; width: max-content; margin: 0 auto; position: relative;}
 
+/* --- NUOVO: STILI AREA DI RISPETTO (BUFFER) --- */
+.scaffale-buffer {
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(200, 200, 200, 0.1),
+    rgba(200, 200, 200, 0.1) 10px,
+    rgba(200, 200, 200, 0.3) 10px,
+    rgba(200, 200, 200, 0.3) 20px
+  );
+  border: 1px dashed rgba(150, 150, 150, 0.4);
+  border-radius: 8px;
+  z-index: 1; 
+  pointer-events: none; 
+  transition: all 0.3s ease;
+}
+
+.scaffale-buffer.is-editing {
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(231, 76, 60, 0.05),
+    rgba(231, 76, 60, 0.05) 10px,
+    rgba(231, 76, 60, 0.15) 10px,
+    rgba(231, 76, 60, 0.15) 20px
+  );
+  border-color: rgba(231, 76, 60, 0.4);
+}
+
 /* STILI SCAFFALE NORMALE */
 .scaffale-item { display: block; box-sizing: border-box; position: relative; z-index: 2; border: 1px solid rgba(44, 62, 80, 0.3); border-radius: 4px; background-color: rgba(44, 62, 80, 0.05); transition: all 0.3s ease;}
 .scaffale-item:not(.is-editing):not(.piano-inattivo):hover { z-index: 10; box-shadow: 0 4px 12px rgba(44, 62, 80, 0.2); border-color: rgba(44, 62, 80, 0.8);}
 
-/* STILE SCAFFALE GREYED OUT (Piano non disponibile) */
+/* STILE SCAFFALE GREYED OUT */
 .piano-inattivo {
   opacity: 0.3;
   filter: grayscale(100%);
-  pointer-events: none; /* Impedisce interazioni e tooltip */
+  pointer-events: none;
 }
 
 .scaffale-inner-grid { box-sizing: border-box; width: 100%; height: 100%; }
@@ -324,7 +392,7 @@ onMounted(async () => {
 .tooltip { visibility: hidden; position: absolute; bottom: 110%; left: 50%; transform: translateX(-50%); background: #2c3e50; color: #fff; padding: 8px; border-radius: 6px; font-size: 0.75rem; z-index: 100; white-space: nowrap; box-shadow: 0 4px 6px rgba(0,0,0,0.2);}
 .scaffale-item:not(.is-editing):not(.piano-inattivo):hover .tooltip { visibility: visible; }
 
-/* --- BARRA FLUTTUANTE UNIFICATA --- */
+/* BARRA FLUTTUANTE UNIFICATA */
 .floating-bottom-bar {
   position: fixed;
   bottom: 30px;
@@ -343,10 +411,8 @@ onMounted(async () => {
 }
 
 .view-controls, .edit-controls { display: flex; align-items: center; gap: 15px; }
-
 .divider { width: 1px; height: 30px; background-color: #ddd; margin: 0 10px; }
 
-/* Stili selettore piano */
 .piano-selector { display: flex; align-items: center; gap: 10px; }
 .btn-piano { background: #ecf0f1; border: none; border-radius: 50%; width: 35px; height: 35px; cursor: pointer; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; transition: 0.2s;}
 .btn-piano:hover:not(:disabled) { background: #bdc3c7; }
