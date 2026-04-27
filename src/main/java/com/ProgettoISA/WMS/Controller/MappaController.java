@@ -23,23 +23,29 @@ public class MappaController {
         this.mappaService = mappaService;
     }
 
-@GetMapping("/carica")
-public ResponseEntity<List<MappaDTO>> getMappa() {
-    try {
-        List<MappaDTO> mappa = mappaService.getTuttaLaMappa();
-        return ResponseEntity.ok(mappa);
-    } catch (Exception e) {
-        return ResponseEntity.internalServerError().build();
+    @GetMapping("/carica")
+    public ResponseEntity<List<MappaDTO>> getMappa() {
+        try {
+            List<MappaDTO> mappa = mappaService.getTuttaLaMappa();
+            return ResponseEntity.ok(mappa);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
     }
-}
 
-@PostMapping("/salva-posizioni")
-public ResponseEntity<?> salva(@RequestBody List<MappaDTO> mappaDTOs) {
-    try {
-        mappaService.salvaPosizioni(mappaDTOs);
-        return ResponseEntity.ok().build();
-    } catch (Exception e) {
-        return ResponseEntity.internalServerError().build();
-    }
+    @PostMapping("/salva-posizioni")
+    public ResponseEntity<?> salva(@RequestBody List<MappaDTO> mappaDTOs) {
+        try {
+            mappaService.salvaPosizioni(mappaDTOs);
+            return ResponseEntity.ok().build();
+            
+        } catch (IllegalArgumentException e) {
+            // Se l'errore è "Dati Sbagliati" (Collisioni, Bordi), restituiamo 400!
+            return ResponseEntity.badRequest().body(e.getMessage());
+            
+        } catch (Exception e) {
+            // Per tutti gli altri disastri veri, restituiamo 500
+            return ResponseEntity.internalServerError().build();
+        }
     }
 }

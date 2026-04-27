@@ -12,6 +12,7 @@ import static org.mockito.ArgumentMatchers.any;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -30,7 +31,6 @@ public class MappaServiceTest {
     @Mock
     private MappaRepository mappaRepository;
 
-    // Rinominato per coincidere col nome della variabile in MappaService (scaffaliRepository)
     @Mock
     private ScaffaliRepository scaffaliRepository; 
 
@@ -59,11 +59,11 @@ public class MappaServiceTest {
 
         // Lo scaffale "Ostacolo" già presente (Coordinate X=0, Y=0)
         mappa1 = new Mappa(reparto1, scaffale1, 0, 0, "VERTICALE");
-        mappa1.setId(1L); // FONDAMENTALE per il check delle collisioni
+        mappa1.setId(1L);
 
         // Lo scaffale "Kamikaze" che vogliamo salvare (Coordinate X=0, Y=0)
         mappa2 = new Mappa(reparto1, scaffale2, 0, 0, "ORIZZONTALE");
-        mappa2.setId(2L); // FONDAMENTALE
+        mappa2.setId(2L);
 
         // I DTO di input
         mappa1DTO = new MappaDTO(1L, 0, 0, scaffale1.getId(), reparto1.getId(), "VERTICALE");
@@ -72,33 +72,86 @@ public class MappaServiceTest {
 
     @Test
     void seScaffaleSiSovrappone_lanciaEccezione() {
-        // --- 1. ARRANGE ---
-        
-        // A. Il Service deve recuperare il record che stiamo cercando di modificare (mappa2DTO ha id=2L)
+        // --- ARRANGE ---
         when(mappaRepository.findById(2L)).thenReturn(Optional.of(mappa2));
-
-        // B. Il Service deve recuperare Reparto e Scaffale associati
         when(repartiRepository.findById(1L)).thenReturn(Optional.of(reparto1));
         when(scaffaliRepository.findById(2L)).thenReturn(Optional.of(scaffale2));
-
-        // C. Il finto DB dice al Service che nel Reparto A c'è già "mappa1"
         when(mappaRepository.findByRepartoId(1L)).thenReturn(List.of(mappa1));
 
-        // Creiamo il payload in ingresso
         List<MappaDTO> listaDaSalvare = List.of(mappa2DTO);
 
-        // --- 2. ACT & ASSERT (Mettiamo alla prova l'algoritmo AABB) ---
-        
-        // Eseguiamo il salvataggio e ci aspettiamo un'eccezione perché sia mappa1 che mappa2 sono in (0,0)
+        // --- ACT & ASSERT ---
         RuntimeException eccezione = assertThrows(RuntimeException.class, () -> {
             mappaService.salvaPosizioni(listaDaSalvare);
         });
 
-        // Verifichiamo che l'eccezione sia scattata ESATTAMENTE per il nostro errore di sovrapposizione 
-        // e non per un'altra NullPointerException casuale
         assertTrue(eccezione.getMessage().contains("sovrappone a un altro scaffale"));
-
-        // Verifichiamo che l'algoritmo abbia bloccato tutto e il DB finto non abbia mai ricevuto il comando "saveAll"
         verify(mappaRepository, never()).saveAll(any());
+
+        // IL NOSTRO FEEDBACK VISIVO
+        System.out.println("✅ TEST COLLISIONI SUPERATO: Il sistema ha bloccato la sovrapposizione degli scaffali!");
     }
+
+    @Test
+    void seScaffaleEsceDaiBordi_lanciaEccezione() {
+        // --- ARRANGE ---
+        // Proviamo a mettere lo scaffale (lungo 5) alla coordinata X=9. 
+        // 9 + 5 = 14. Il reparto finisce a 10. Deve esplodere!
+        MappaDTO dtoFuoriBordo = new MappaDTO(2L, 9, 2, scaffale2.getId(), reparto1.getId(), "ORIZZONTALE");
+        
+        when(mappaRepository.findById(2L)).thenReturn(Optional.of(mappa2));
+        when(repartiRepository.findById(1L)).thenReturn(Optional.of(reparto1));
+        when(scaffaliRepository.findById(2L)).thenReturn(Optional.of(scaffale2));
+        
+        // NOTA: Non ci serve mockare 'findByRepartoId' qui, perché l'eccezione dei bordi 
+        // bloccherà il codice prima ancora che il Service cerchi di leggere gli altri scaffali!
+
+        List<MappaDTO> listaDaSalvare = List.of(dtoFuoriBordo);
+
+        // --- ACT & ASSERT ---
+        RuntimeException eccezione = assertThrows(RuntimeException.class, () -> {
+            mappaService.salvaPosizioni(listaDaSalvare);
+        });
+
+        assertTrue(eccezione.getMessage().contains("esce dai bordi"));
+        verify(mappaRepository, never()).saveAll(any());
+
+        //FEEDBACK VISIVO
+        System.out.println("✅ TEST BORDI SUPERATO: Il sistema ha impedito allo scaffale di uscire dalla mappa!");
+    }
+
+    @Test
+    void salvaPosizioni_successo() {
+        // --- ARRANGE ---
+        // Spostiamo lo scaffale 2 in una posizione libera (5,5)
+        MappaDTO dtoValido = new MappaDTO(2L, 5, 5, scaffale2.getId(), reparto1.getId(), "ORIZZONTALE");
+        
+        when(mappaRepository.findById(2L)).thenReturn(Optional.of(mappa2));
+        when(repartiRepository.findById(reparto1.getId())).thenReturn(Optional.of(reparto1));
+        when(scaffaliRepository.findById(scaffale2.getId())).thenReturn(Optional.of(scaffale2));
+        // Mockiamo una lista vuota: non ci sono ostacoli in (5,5)
+        when(mappaRepository.findByRepartoId(reparto1.getId())).thenReturn(List.of(mappa1));
+
+        // --- ACT ---
+        mappaService.salvaPosizioni(List.of(dtoValido));
+
+        // --- ASSERT ---
+        // Verifichiamo che il repository abbia ricevuto il comando di salvare
+        verify(mappaRepository, times(1)).saveAll(any());
+        System.out.println("✅ TEST SUCCESS: Scaffale spostato correttamente in zona libera!");
+    }
+
+    @Test
+    void salvaPosizioni_mappaNonTrovata_lanciaEccezione() {
+        // ARRANGE: ID inesistente nel DB
+        MappaDTO dtoFantasma = new MappaDTO(999L, 0, 0, 1L, 1L, "ORIZZONTALE");
+        when(mappaRepository.findById(999L)).thenReturn(Optional.empty());
+
+        // ACT & ASSERT
+        assertThrows(RuntimeException.class, () -> {
+            mappaService.salvaPosizioni(List.of(dtoFantasma));
+        });
+        System.out.println("✅ TEST NOT FOUND: Gestito correttamente il caso di record inesistente!");
+    }
+    
 }
