@@ -9,6 +9,8 @@ import DipendenteHome from "./views/DipendenteHome.vue";
 import DipendenteTask from "./views/DipendenteTask.vue";
 import StoricoMovimenti from "./views/StoricoMovimenti.vue";
 import GestioneTask from "./views/GestioneTask.vue";
+import GestioneTurni from './views/GestioneTurni.vue';
+import MappaMagazzino from './views/MappaMagazzino.vue';
 
 
 // 2. Rotte
@@ -56,7 +58,12 @@ const routes = [
     {
         path: '/GestioneTurni',
         name: 'GestioneTurni',
-        component: () => import('./views/GestioneTurni.vue')
+        component: GestioneTurni
+    },
+    {
+        path: '/MappaMagazzino',
+        name: 'MappaMagazzino',
+        component: MappaMagazzino
     }
 ]
 

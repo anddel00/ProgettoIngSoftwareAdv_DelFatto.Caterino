@@ -32,21 +32,25 @@ public class Mappa {
     @Column(name = "\"Y\"", nullable = false)
     private int y;
 
+    @Column(name = "\"OrientamentoScaffale\"", nullable = false)
+    private String orientamentoScaffale;
+
     public Mappa() {
     }
 
-    public Mappa(Reparti reparto, Scaffali scaffale, int x, int y) {
+    public Mappa(Reparti reparto, Scaffali scaffale, int x, int y, String orientamentoScaffale) {
         this.reparto = reparto;
         this.scaffale = scaffale;
         this.x = x;
         this.y = y;
+        this.orientamentoScaffale = orientamentoScaffale;
     }
 
     public long getId() {
         return id;
     }
 
-    public void setId(Integer id) {
+    public void setId(long id) {
         this.id = id;
     }
 
@@ -80,6 +84,14 @@ public class Mappa {
 
     public void setY(int y) {
         this.y = y;
+    }
+
+    public String getOrientamentoScaffale() {
+        return orientamentoScaffale;
+    }
+
+    public void setOrientamentoScaffale(String orientamentoScaffale) {
+        this.orientamentoScaffale = orientamentoScaffale;
     }
 
 }
