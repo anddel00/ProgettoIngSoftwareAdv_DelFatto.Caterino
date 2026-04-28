@@ -22,7 +22,7 @@ public class BatchProdotti {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "\"Id\"", nullable = false)
-    private Integer id;
+    private long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "\"Id_Prodotto\"", nullable = false)
@@ -47,11 +47,11 @@ public class BatchProdotti {
         this.scadenza = scadenza;
     }
 
-    public Integer getId() {
+    public Long getId() {
         return id;
     }
 
-    public void setId(Integer id) {
+    public void setId(Long id) {
         this.id = id;
     }
 
