@@ -1,16 +1,16 @@
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue' // Aggiunto watch
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../api'
 
 import AdminSidebar from '../components/AdminSidebar.vue'
-import { useWmsWebSocket } from '../composables/useWmsWebSocket.js' // Il nostro cervello real-time
+import { useWmsWebSocket } from '../composables/useWmsWebSocket.js'
 
 const router = useRouter()
 const nomeUtente = ref(sessionStorage.getItem('nomeUtente') || 'Amministratore')
 
 const tuttiTask = ref([])
-const dipendentiInTurnoCount = ref(0) // Nuova variabile per il conteggio reale dei turni
+const dipendentiInTurnoCount = ref(0)
 
 // 1. ESTRAIAMO IL WEBSOCKET
 const { ultimoTaskRicevuto } = useWmsWebSocket()
@@ -19,7 +19,7 @@ const { ultimoTaskRicevuto } = useWmsWebSocket()
 const fetchDashboardData = async () => {
   try {
     const response = await api.get('/api/tasks/tutti')
-    tuttiTask.value = response.data.reverse() // Reverse per avere i più recenti in cima
+    tuttiTask.value = response.data.reverse()
   } catch (error) {
     console.error("Errore nel recupero dati dashboard:", error)
   }
@@ -35,8 +35,6 @@ const fetchTurniAttivi = async () => {
 }
 
 // 3. LA MAGIA DEL REAL-TIME
-// Quando qualcuno sposta un pacco, la dashboard intercetta e aggiorna la lista.
-// Le "computed" sottostanti ricalcoleranno tutto automaticamente!
 watch(ultimoTaskRicevuto, (nuovoTask) => {
   if (nuovoTask) {
     const index = tuttiTask.value.findIndex(t => t.id === nuovoTask.id)
@@ -54,21 +52,18 @@ const conteggioTaskAttivi = computed(() => {
   return tuttiTask.value.filter(t => t.statoTask !== 'COMPLETATO').length
 })
 
-// Efficienza = (Task Completati / Totale Task) * 100
 const efficienzaOdierna = computed(() => {
   if (tuttiTask.value.length === 0) return 0;
   const completati = tuttiTask.value.filter(t => t.statoTask === 'COMPLETATO').length
   return Math.round((completati / tuttiTask.value.length) * 100)
 })
 
-// Card 1: Ultimi Eventi (Gli ultimi 5 task COMPLETATI)
 const ultimiCompletati = computed(() => {
   return tuttiTask.value
       .filter(t => t.statoTask === 'COMPLETATO')
-      .slice(0, 5) // Prende solo i primi 5
+      .slice(0, 5)
 })
 
-// Card 2: Attività in Corso (Gli ultimi 5 task attualmente IN_CARICO)
 const attivitaInCorso = computed(() => {
   return tuttiTask.value
       .filter(t => t.statoTask === 'IN_CARICO')
@@ -85,11 +80,15 @@ const vaiAStorico = () => { router.push('/StoricoMovimenti') }
 </script>
 
 <template>
-  <div class="dashboard-layout">
-    <AdminSidebar />
+  <div class="glass-dashboard-layout">
+    <div class="glass-bg-blob blob-1"></div>
+    <div class="glass-bg-blob blob-2"></div>
+    <div class="glass-bg-blob blob-3"></div>
+
+    <AdminSidebar class="glass-sidebar" />
 
     <main class="main-content">
-      <header class="topbar">
+      <header class="glass-topbar">
         <div class="topbar-left">
           <span class="greeting">Bentornato,</span>
           <h1>{{ nomeUtente }}</h1>
@@ -102,78 +101,91 @@ const vaiAStorico = () => { router.push('/StoricoMovimenti') }
       <div class="content-area">
 
         <div class="stats-row">
-          <div class="stat-card">
-            <span class="stat-title">Task Attivi</span>
-            <h2 class="stat-value">{{ conteggioTaskAttivi }}</h2>
+          <div class="glass-card stat-card">
+            <div class="stat-icon-wrapper blue-glow">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+            </div>
+            <div class="stat-info">
+              <span class="stat-title">Task Attivi</span>
+              <h2 class="stat-value">{{ conteggioTaskAttivi }}</h2>
+            </div>
           </div>
-          <div class="stat-card">
-            <span class="stat-title">Dipendenti in Turno</span>
-            <h2 class="stat-value" style="color: #3b82f6">{{ dipendentiInTurnoCount }}</h2>
+
+          <div class="glass-card stat-card">
+            <div class="stat-icon-wrapper purple-glow">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+            </div>
+            <div class="stat-info">
+              <span class="stat-title">Dipendenti in Turno</span>
+              <h2 class="stat-value">{{ dipendentiInTurnoCount }}</h2>
+            </div>
           </div>
-          <div class="stat-card">
-            <span class="stat-title">Efficienza Complessiva</span>
-            <h2 class="stat-value" :style="{ color: efficienzaOdierna > 50 ? '#10b981' : '#f59e0b' }">
-              {{ efficienzaOdierna }}%
-            </h2>
+
+          <div class="glass-card stat-card">
+            <div class="stat-icon-wrapper" :class="efficienzaOdierna > 50 ? 'green-glow' : 'orange-glow'">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+            </div>
+            <div class="stat-info">
+              <span class="stat-title">Efficienza</span>
+              <h2 class="stat-value">{{ efficienzaOdierna }}%</h2>
+            </div>
           </div>
         </div>
 
         <div class="dashboard-cards">
 
-          <div class="card" style="padding: 0; overflow: hidden;">
-            <div class="card-header" style="padding: 24px; margin: 0; border-bottom: 1px solid #e2e8f0; background: #f8fafc;">
-              <h3>Ultimi Eventi Completati</h3>
-              <button @click="vaiAStorico" class="btn-ghost">Vedi storico</button>
+          <div class="glass-card list-card">
+            <div class="card-header">
+              <h3>Ultimi Completati</h3>
+              <button @click="vaiAStorico" class="btn-glass-ghost">Storico</button>
             </div>
 
             <div v-if="ultimiCompletati.length > 0" class="inbound-list">
-              <div v-for="task in ultimiCompletati" :key="task.id" class="inbound-item">
+              <div v-for="task in ultimiCompletati" :key="task.id" class="inbound-item glass-item">
                 <div class="inbound-info">
-                  <div style="display: flex; align-items: center; gap: 8px;">
+                  <div class="task-header">
                     <span class="task-id">#TSK-{{ task.id }}</span>
-                    <span class="badge" style="background: #d1fae5; color: #065f46; font-size: 10px; padding: 2px 6px;">COMPLETATO</span>
+                    <span class="glass-badge badge-success">COMPLETATO</span>
                   </div>
                   <p class="item-desc">{{ task.descrizione }}</p>
-                  <span style="font-size: 12px; color: #64748b;">da: <strong>{{ task.nomeDipendente || 'Operatore' }}</strong></span>
+                  <span class="operator-name">Da: <strong>{{ task.nomeDipendente || 'Operatore' }}</strong></span>
                 </div>
               </div>
             </div>
 
-            <div v-else class="empty-state-modern">
+            <div v-else class="empty-state-glass">
               <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
-              <p>Nessun task completato di recente.</p>
+              <p>Nessun task completato.</p>
             </div>
           </div>
 
-          <div class="card" style="padding: 0; overflow: hidden;">
-            <div class="card-header" style="padding: 24px; margin: 0; border-bottom: 1px solid #e2e8f0; background: #f8fafc;">
+          <div class="glass-card list-card">
+            <div class="card-header">
               <h3>In Lavorazione Ora</h3>
-              <button @click="vaiAGestioneTask" class="btn-ghost">Gestisci task</button>
+              <button @click="vaiAGestioneTask" class="btn-glass-ghost">Gestisci</button>
             </div>
 
             <div v-if="attivitaInCorso.length > 0" class="inbound-list">
-              <div v-for="task in attivitaInCorso" :key="task.id" class="inbound-item">
+              <div v-for="task in attivitaInCorso" :key="task.id" class="inbound-item glass-item">
                 <div class="inbound-info">
-                  <div style="display: flex; align-items: center; gap: 8px;">
+                  <div class="task-header">
                     <span class="task-id">#TSK-{{ task.id }}</span>
-                    <span class="badge" style="background: #dbeafe; color: #1e40af; font-size: 10px; padding: 2px 6px;">IN CARICO</span>
+                    <span class="glass-badge badge-active">IN CARICO</span>
                   </div>
                   <p class="item-desc">{{ task.descrizione }}</p>
                 </div>
-                <div class="inbound-meta" style="flex-direction: column; align-items: flex-end; gap: 4px;">
-                  <div style="display: flex; align-items: center; gap: 6px;">
-                    <div style="width: 20px; height: 20px; background: #e2e8f0; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold;">
-                      {{ task.nomeDipendente ? task.nomeDipendente.charAt(0) : 'O' }}
-                    </div>
-                    <span style="font-size: 12px; font-weight: 600;">{{ task.nomeDipendente || 'Operatore' }}</span>
+                <div class="inbound-meta">
+                  <div class="operator-chip">
+                    <div class="mini-avatar">{{ task.nomeDipendente ? task.nomeDipendente.charAt(0) : 'O' }}</div>
+                    <span>{{ task.nomeDipendente || 'Operatore' }}</span>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div v-else class="empty-state-modern">
+            <div v-else class="empty-state-glass">
               <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-              <p>Nessuno sta lavorando a un task in questo momento.</p>
+              <p>Nessuna attività in corso.</p>
             </div>
           </div>
 
@@ -182,119 +194,69 @@ const vaiAStorico = () => { router.push('/StoricoMovimenti') }
     </main>
   </div>
 </template>
+
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
-/* ------- RESET E LAYOUT PRINCIPALE ------- */
-.dashboard-layout {
+/* ------- LAYOUT & BACKGROUND ANIMATO ------- */
+.glass-dashboard-layout {
   display: flex;
   height: 100vh;
   width: 100vw;
-  background-color: #f8fafc; /* Grigio chiarissimo, quasi azzurro */
+  /* Colore base neutro ma leggermente freddo */
+  background-color: #e2e8f0;
   font-family: 'Inter', sans-serif;
   margin: 0;
-  color: #334155;
+  color: #1e293b;
+  position: relative;
+  overflow: hidden;
 }
 
-/* ------- SIDEBAR PREMIUM ------- */
-.sidebar {
-  width: 260px;
-  background-color: #0f172a; /* Slate 900 - Molto più elegante del blu scuro base */
-  color: #94a3b8;
-  display: flex;
-  flex-direction: column;
-  border-right: 1px solid #1e293b;
+/* Le macchie di colore che danno vita al vetro */
+.glass-bg-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  z-index: 0;
+  opacity: 0.6;
 }
 
-.sidebar-header {
-  padding: 30px 24px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
+.blob-1 {
+  top: -10%; left: -10%;
+  width: 500px; height: 500px;
+  background: #93c5fd; /* Azzurro */
 }
 
-.logo-icon svg {
-  width: 28px;
-  height: 28px;
-  color: #6366f1; /* Indigo moderno */
+.blob-2 {
+  bottom: -20%; right: -10%;
+  width: 600px; height: 600px;
+  background: #c4b5fd; /* Viola */
 }
 
-.sidebar-header h2 {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 700;
-  color: #f8fafc;
-  letter-spacing: -0.5px;
+.blob-3 {
+  top: 40%; left: 40%;
+  width: 400px; height: 400px;
+  background: #86efac; /* Verde acqua */
+  opacity: 0.4;
 }
 
-.sidebar-nav {
-  flex-grow: 1;
-  padding: 0 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+/* Elementi in primo piano sopra lo sfondo */
+.main-content, .glass-sidebar {
+  position: relative;
+  z-index: 10;
 }
 
-.nav-item {
-  padding: 12px 16px;
-  border-radius: 12px; /* Forma a pillola moderna */
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  transition: all 0.2s ease;
+/* ------- IL VETRO (MIXIN) ------- */
+.glass-card {
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.1);
+  border-radius: 20px;
 }
 
-.nav-icon {
-  width: 20px;
-  height: 20px;
-  opacity: 0.7;
-}
-
-.nav-item:hover {
-  background-color: #1e293b;
-  color: #f8fafc;
-}
-
-.nav-item.active {
-  background-color: rgba(99, 102, 241, 0.15); /* Sfondo indigo traslucido */
-  color: #6366f1; /* Testo indigo */
-  font-weight: 600;
-}
-
-.nav-item.active .nav-icon {
-  opacity: 1;
-}
-
-.sidebar-footer {
-  padding: 24px 16px;
-}
-
-.btn-logout {
-  width: 100%;
-  padding: 12px;
-  background-color: transparent;
-  color: #94a3b8;
-  border: 1px solid #1e293b;
-  border-radius: 12px;
-  cursor: pointer;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  transition: all 0.2s;
-}
-
-.btn-logout:hover {
-  background-color: #ef4444;
-  color: white;
-  border-color: #ef4444;
-}
-
-/* ------- CONTENUTO PRINCIPALE ------- */
+/* ------- TOPBAR ------- */
 .main-content {
   flex-grow: 1;
   display: flex;
@@ -302,164 +264,122 @@ const vaiAStorico = () => { router.push('/StoricoMovimenti') }
   overflow-y: auto;
 }
 
-.topbar {
-  background-color: #ffffff;
-  padding: 24px 40px;
+.glass-topbar {
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  padding: 20px 40px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
 }
 
-.greeting {
-  font-size: 14px;
-  color: #64748b;
-  font-weight: 500;
-}
-
-.topbar h1 {
-  margin: 4px 0 0 0;
-  font-size: 24px;
-  font-weight: 700;
-  color: #0f172a;
-  letter-spacing: -0.5px;
-}
-
-.user-profile {
-  display: flex;
-  align-items: center;
-}
+.greeting { font-size: 14px; color: #475569; font-weight: 500; }
+.topbar-left h1 { margin: 4px 0 0 0; font-size: 24px; font-weight: 700; color: #0f172a; letter-spacing: -0.5px; }
 
 .avatar {
-  width: 44px;
-  height: 44px;
-  background: linear-gradient(135deg, #6366f1, #a855f7);
+  width: 44px; height: 44px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.8), rgba(168, 85, 247, 0.8));
+  backdrop-filter: blur(5px);
+  border: 1px solid rgba(255,255,255,0.5);
   border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-weight: 600;
-  font-size: 18px;
-  box-shadow: 0 4px 6px -1px rgba(99, 102, 241, 0.3);
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-weight: 600; font-size: 18px;
+  box-shadow: 0 4px 10px rgba(99, 102, 241, 0.3);
 }
 
-.content-area {
-  padding: 40px;
-  max-width: 1200px;
-}
+.content-area { padding: 40px; max-width: 1200px; margin: 0 auto; width: 100%; box-sizing: border-box;}
 
-/* ------- STATISTICHE RAPIDE ------- */
-.stats-row {
-  display: flex;
-  gap: 24px;
-  margin-bottom: 32px;
-}
+/* ------- STATISTICHE ------- */
+.stats-row { display: flex; gap: 24px; margin-bottom: 32px; }
 
 .stat-card {
-  flex: 1;
-  background: #ffffff;
-  padding: 24px;
+  flex: 1; padding: 24px;
+  display: flex; align-items: center; gap: 20px;
+  transition: transform 0.2s;
+}
+.stat-card:hover { transform: translateY(-5px); }
+
+.stat-icon-wrapper {
+  width: 56px; height: 56px;
   border-radius: 16px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255,255,255,0.5);
 }
+.stat-icon-wrapper svg { width: 28px; height: 28px; }
 
-.stat-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #64748b;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
+/* Bagliori colorati per le icone */
+.blue-glow { color: #3b82f6; box-shadow: 0 0 20px rgba(59, 130, 246, 0.2); }
+.purple-glow { color: #a855f7; box-shadow: 0 0 20px rgba(168, 85, 247, 0.2); }
+.green-glow { color: #10b981; box-shadow: 0 0 20px rgba(16, 185, 129, 0.2); }
+.orange-glow { color: #f59e0b; box-shadow: 0 0 20px rgba(245, 158, 11, 0.2); }
 
-.stat-value {
-  margin: 12px 0 0 0;
-  font-size: 32px;
-  font-weight: 700;
-  color: #0f172a;
-}
+.stat-info { display: flex; flex-direction: column; }
+.stat-title { font-size: 13px; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-value { margin: 4px 0 0 0; font-size: 32px; font-weight: 800; color: #0f172a; }
 
-/* ------- CARD DELLA DASHBOARD ------- */
-.dashboard-cards {
-  display: flex;
-  gap: 24px;
-}
-
-.card {
-  background: #ffffff;
-  flex: 1;
-  padding: 28px;
-  border-radius: 16px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
-  display: flex;
-  flex-direction: column;
-}
+/* ------- CARD LISTE ------- */
+.dashboard-cards { display: flex; gap: 24px; }
+.list-card { flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 0;}
 
 .card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
+  padding: 24px;
+  display: flex; justify-content: space-between; align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.4);
 }
+.card-header h3 { margin: 0; font-size: 18px; font-weight: 700; color: #0f172a; }
 
-.card h3 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: #0f172a;
+.btn-glass-ghost {
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  color: #475569; font-weight: 600; font-size: 13px;
+  cursor: pointer; padding: 6px 14px; border-radius: 8px;
+  transition: all 0.2s;
 }
-
-.btn-ghost {
-  background: transparent;
-  border: none;
-  color: #6366f1;
-  font-weight: 600;
-  font-size: 13px;
-  cursor: pointer;
-  padding: 6px 12px;
-  border-radius: 6px;
-  transition: background 0.2s;
-}
-
-.btn-ghost:hover {
-  background: rgba(99, 102, 241, 0.1);
-}
-
-.empty-state-modern {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  flex-grow: 1;
-  padding: 40px 0;
-  color: #94a3b8;
-}
-
-.empty-state-modern svg {
-  width: 48px;
-  height: 48px;
-  margin-bottom: 16px;
-  opacity: 0.5;
-}
-
-.empty-state-modern p {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 500;
-}
+.btn-glass-ghost:hover { background: rgba(255, 255, 255, 0.8); color: #0f172a; transform: translateY(-1px);}
 
 .inbound-list { display: flex; flex-direction: column; }
-.inbound-item { padding: 16px 24px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; transition: background-color 0.2s; }
-.inbound-item:hover { background-color: #f8fafc; }
-.inbound-item:last-child { border-bottom: none; }
-.inbound-info { display: flex; flex-direction: column; gap: 4px; }
-.task-id { font-size: 12px; font-weight: 600; color: #94a3b8; font-family: monospace; }
-.item-desc { margin: 0; font-size: 14px; font-weight: 600; color: #0f172a; }
-.inbound-meta { display: flex; align-items: center; gap: 16px; }
-.qty-badge { background: #f1f5f9; color: #475569; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: 700; }
-.status-text { font-size: 12px; font-weight: 700; }
-.text-gray { color: #64748b; }
-.text-blue { color: #2563eb; }
+.glass-item {
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+  display: flex; justify-content: space-between; align-items: center;
+  transition: background 0.2s;
+}
+.glass-item:hover { background: rgba(255, 255, 255, 0.3); }
+.glass-item:last-child { border-bottom: none; }
+
+.inbound-info { display: flex; flex-direction: column; gap: 6px; }
+.task-header { display: flex; align-items: center; gap: 10px; }
+.task-id { font-size: 13px; font-weight: 700; color: #64748b; font-family: monospace; }
+.item-desc { margin: 0; font-size: 15px; font-weight: 600; color: #1e293b; }
+.operator-name { font-size: 12px; color: #64748b; }
+
+.glass-badge {
+  font-size: 10px; font-weight: 800; padding: 4px 8px; border-radius: 6px;
+  backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.4);
+}
+.badge-success { background: rgba(16, 185, 129, 0.2); color: #065f46; }
+.badge-active { background: rgba(59, 130, 246, 0.2); color: #1e40af; }
+
+.operator-chip {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(255, 255, 255, 0.5); padding: 4px 12px 4px 4px;
+  border-radius: 20px; border: 1px solid rgba(255,255,255,0.4);
+}
+.mini-avatar {
+  width: 24px; height: 24px; background: #cbd5e1; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: bold; color: #334155;
+}
+.operator-chip span { font-size: 13px; font-weight: 600; color: #334155; }
+
+.empty-state-glass {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 60px 0; color: #64748b;
+}
+.empty-state-glass svg { width: 48px; height: 48px; margin-bottom: 16px; opacity: 0.4; }
+.empty-state-glass p { margin: 0; font-size: 15px; font-weight: 500; }
 </style>

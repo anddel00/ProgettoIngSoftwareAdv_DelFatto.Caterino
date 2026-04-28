@@ -36,8 +36,9 @@ watch(() => route.path, (nuovoPath) => {
   }
 }, { immediate: true })
 </script>
+
 <template>
-  <aside class="sidebar">
+  <aside class="glass-sidebar">
     <div class="sidebar-header">
       <div class="logo-icon">
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
@@ -100,25 +101,126 @@ watch(() => route.path, (nuovoPath) => {
 </template>
 
 <style scoped>
-.sidebar { width: 260px; background-color: #0f172a; color: #94a3b8; display: flex; flex-direction: column; border-right: 1px solid #1e293b; }
-.sidebar-header { padding: 30px 24px; display: flex; align-items: center; gap: 12px; }
-.logo-icon svg { width: 28px; height: 28px; color: #6366f1; }
-.sidebar-header h2 { margin: 0; font-size: 20px; font-weight: 700; color: #f8fafc; letter-spacing: -0.5px; }
-.sidebar-nav { flex-grow: 1; padding: 0 16px; display: flex; flex-direction: column; gap: 8px; }
-.nav-item { padding: 12px 16px; border-radius: 12px; cursor: pointer; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 12px; transition: all 0.2s ease; }
-.nav-icon { width: 20px; height: 20px; opacity: 0.7; }
-.nav-item:hover { background-color: #1e293b; color: #f8fafc; }
-.nav-item.active { background-color: rgba(99, 102, 241, 0.15); color: #6366f1; font-weight: 600; }
-.nav-item.active .nav-icon { opacity: 1; }
-.sidebar-footer { padding: 24px 16px; }
-.btn-logout { width: 100%; padding: 12px; background-color: transparent; color: #94a3b8; border: 1px solid #1e293b; border-radius: 12px; cursor: pointer; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s; }
-.btn-logout:hover { background-color: #ef4444; color: white; border-color: #ef4444; }
+/* ------- EFFETTO GLASS SCURO PER LA SIDEBAR ------- */
+.glass-sidebar {
+  width: 260px;
+  /* Sfondo molto più scuro e meno trasparente per bloccare l'alone luminoso */
+  background-color: rgba(11, 15, 25, 0.85);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  color: #cbd5e1; /* Testo di default più chiaro per massimo contrasto */
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  z-index: 20;
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.3); /* Stacca la sidebar dal contenuto */
+}
 
-/* STILI PER I BADGE AGGIUNTI */
-.badge-notifica {
-  margin-left: auto; /* Spinge il badge tutto a destra */
-  font-size: 0.75rem;
+.sidebar-header {
+  padding: 30px 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo-icon svg {
+  width: 28px;
+  height: 28px;
+  color: #60a5fa;
+  filter: drop-shadow(0 0 6px rgba(96, 165, 250, 0.4));
+}
+
+.sidebar-header h2 {
+  margin: 0;
+  font-size: 20px;
   font-weight: 700;
+  color: #ffffff; /* Bianco puro per il titolo */
+  letter-spacing: -0.5px;
+}
+
+.sidebar-nav {
+  flex-grow: 1;
+  padding: 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* --- TASTI DI NAVIGAZIONE --- */
+.nav-item {
+  padding: 12px 16px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.nav-icon {
+  width: 20px;
+  height: 20px;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+/* Hover: Sfondo leggermente più chiaro ma senza bagliori confusi */
+.nav-item:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.nav-item:hover .nav-icon {
+  opacity: 1;
+}
+
+/* STATO ATTIVO: Sfondo azzurro traslucido, molto pulito */
+.nav-item.active {
+  background-color: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  font-weight: 600;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.nav-item.active .nav-icon {
+  opacity: 1;
+}
+
+/* --- FOOTER / DISCONNETTI --- */
+.sidebar-footer {
+  padding: 24px 16px;
+}
+
+.btn-logout {
+  width: 100%;
+  padding: 12px;
+  background-color: rgba(255, 255, 255, 0.03);
+  color: #94a3b8;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.btn-logout:hover {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+/* --- BADGE --- */
+.badge-notifica {
+  margin-left: auto;
+  font-size: 0.7rem;
+  font-weight: 800;
   color: white;
   padding: 2px 8px;
   border-radius: 12px;
@@ -126,10 +228,7 @@ watch(() => route.path, (nuovoPath) => {
   text-align: center;
   line-height: 1.2;
 }
-.badge-blu {
-  background-color: #3b82f6;
-}
-.badge-verde {
-  background-color: #10b981;
-}
+
+.badge-blu { background: #3b82f6; }
+.badge-verde { background: #10b981; }
 </style>

@@ -11,14 +11,17 @@ const loading = ref(true);
 const route = useRoute();
 const router = useRouter();
 
-// --- RIPARAZIONE PROPORZIONI REPARTO SECCO ---
+// --- RIPARAZIONE PROPORZIONI REPARTO SECCO (Forzatura Verticale) ---
 const repartoVisuale = computed(() => {
   const idRepartoSelezionato = parseInt(route.params.id);
   const r = repartiDati.value.find(rep => rep.id === idRepartoSelezionato);
 
   if (!r) return null;
-  const repCopy = { ...r };
+  // Creiamo una copia profonda per non sporcare i dati reattivi globali
+  const repCopy = JSON.parse(JSON.stringify(r));
 
+  // Forza SEMPRE il reparto 2 (o qualsiasi reparto più largo che alto) a essere verticale
+  // Questo allinea la logica con la planimetria esterna.
   if (repCopy.id === 2 && repCopy.maxX > repCopy.maxY) {
     const temp = repCopy.maxX;
     repCopy.maxX = repCopy.maxY;
@@ -232,7 +235,7 @@ const salvaMappa = async () => {
     isEditing.value = false;
     scaffaleSelezionato.value = null;
   } catch (error) {
-    alert("❌ Errore durante il salvataggio.");
+    alert("Errore durante il salvataggio.");
   } finally {
     isSaving.value = false;
   }
@@ -418,28 +421,30 @@ onMounted(async () => {
       <div class="modal-content" @click.stop>
         <div class="modal-header">
           <h3>Dettagli Scaffale <span class="text-blue">S{{ scaffaleInfoAttivo.idScaffale }}</span></h3>
-          <button @click="chiudiInfoScaffale" class="btn-close-modal">✖</button>
+          <button @click="chiudiInfoScaffale" class="btn-close-modal">
+            <svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
         </div>
         <div class="modal-body">
           <div class="info-row">
-            <span class="info-label">📍 Posizione Rilevata:</span>
+            <span class="info-label">Posizione Rilevata:</span>
             <span class="info-value">X: {{ scaffaleInfoAttivo.coordinataX }}, Y: {{ scaffaleInfoAttivo.coordinataY }}</span>
           </div>
           <div class="info-row">
-            <span class="info-label">🔄 Orientamento:</span>
+            <span class="info-label">Orientamento:</span>
             <span class="info-value">{{ scaffaleInfoAttivo.orientamentoScaffale }}</span>
           </div>
           <div class="info-row">
-            <span class="info-label">📏 Dimensioni (Col x Righe):</span>
+            <span class="info-label">Dimensioni (Col x Righe):</span>
             <span class="info-value">{{ getDatiTecniciScaffale(scaffaleInfoAttivo.idScaffale)?.max_colonne }} x {{ getDatiTecniciScaffale(scaffaleInfoAttivo.idScaffale)?.max_righe }}</span>
           </div>
           <div class="info-row">
-            <span class="info-label">🏢 Piani Disponibili:</span>
+            <span class="info-label">Piani Disponibili:</span>
             <span class="info-value">{{ getDatiTecniciScaffale(scaffaleInfoAttivo.idScaffale)?.max_altezza }} piani max</span>
           </div>
           <div class="info-row highlight-row">
-            <span class="info-label">⚖️ Peso Massimo (Per Piano):</span>
-            <span class="info-value">{{ getDatiTecniciScaffale(scaffaleInfoAttivo.idScaffale)?.peso_max_piano || 'N/A' }} Kg</span>
+            <span class="info-label">Peso Totale Massimo:</span>
+            <span class="info-value">{{ getDatiTecniciScaffale(scaffaleInfoAttivo.idScaffale)?.max_peso || 'N/A' }} Kg</span>
           </div>
         </div>
       </div>
@@ -493,13 +498,13 @@ onMounted(async () => {
 .modal-header { background: #f8fafc; padding: 15px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
 .modal-header h3 { margin: 0; color: #0f172a; font-size: 1.2rem; font-weight: 800;}
 .text-blue { color: #3b82f6; }
-.btn-close-modal { background: transparent; border: none; font-size: 1.2rem; color: #64748b; cursor: pointer; transition: 0.2s;}
-.btn-close-modal:hover { color: #ef4444; transform: scale(1.1);}
+.btn-close-modal { background: transparent; border: none; color: #64748b; cursor: pointer; transition: 0.2s; padding: 4px; display: flex; justify-content: center; align-items: center; }
+.btn-close-modal:hover { color: #ef4444; background: #fee2e2; border-radius: 4px; }
 .modal-body { padding: 20px; display: flex; flex-direction: column; gap: 12px; }
 .info-row { display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; border-bottom: 1px dashed #e2e8f0; }
 .info-row:last-child { border-bottom: none; padding-bottom: 0; }
 .highlight-row { background: #f1f5f9; padding: 10px; border-radius: 6px; border: none;}
-.info-label { font-weight: 600; color: #475569; font-size: 0.9rem; }
+.info-label { font-weight: 600; color: #475569; font-size: 0.9rem; display: flex; align-items: center; gap: 8px; }
 .info-value { font-weight: 800; color: #0f172a; font-size: 0.95rem; }
 
 /* --- AREA GRIGLIA E SCROLLING --- */

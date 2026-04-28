@@ -7,6 +7,8 @@ import api from '../api'
 import AdminSidebar from '../components/AdminSidebar.vue'
 
 const router = useRouter()
+const nomeUtente = ref(sessionStorage.getItem('nomeUtente') || 'Admin')
+
 const utenti = ref([])
 const mostraModale = ref(false)
 const isModifica = ref(false)
@@ -14,9 +16,9 @@ const utenteSelezionatoId = ref(null)
 const errorMessage = ref('')
 
 // --- VARIABILI PER LA SICUREZZA ENTERPRISE ---
-const staVerificandoAdmin = ref(false) // Mostra l'input per la pass dell'admin
-const isPasswordUnlocked = ref(false)  // Sblocca il campo della nuova password
-const adminPassword = ref('')          // La password inserita dall'admin per sbloccarsi
+const staVerificandoAdmin = ref(false)
+const isPasswordUnlocked = ref(false)
+const adminPassword = ref('')
 
 const form = ref({
   nome: '',
@@ -24,7 +26,7 @@ const form = ref({
   data_nascita: '',
   email: '',
   password: '',
-  confermaPassword: '', // Solo per la registrazione
+  confermaPassword: '',
   ruolo: 'Admin'
 })
 
@@ -59,12 +61,10 @@ const apriModaleModifica = (dipendente) => {
   utenteSelezionatoId.value = dipendente.id
   errorMessage.value = ''
 
-  // Resettiamo la sicurezza
   staVerificandoAdmin.value = false
   isPasswordUnlocked.value = false
   adminPassword.value = ''
 
-  // Formattiamo la data dal DB (viene letta come "YYYY-MM-DDTHH:mm:ss") in "YYYY-MM-DD" per l'input type="date"
   let dataFormattata = '';
   if (dipendente.data_nascita) {
     dataFormattata = dipendente.data_nascita.split('T')[0];
@@ -99,13 +99,11 @@ const sbloccaCambioPassword = async () => {
   }
 
   try {
-    // verifico la password inserita dall'admin
     await api.post('/api/auth/login', {
       email: emailAdmin,
       password: adminPassword.value
     });
 
-    // se idetifico l'utente, sblocco la modifica della password
     isPasswordUnlocked.value = true;
     staVerificandoAdmin.value = false;
     adminPassword.value = '';
@@ -120,13 +118,11 @@ const sbloccaCambioPassword = async () => {
 const salvaDipendente = async () => {
   errorMessage.value = ''
 
-  // Validazione Campi Base
   if (!form.value.data_nascita) {
     errorMessage.value = "La data di nascita è obbligatoria.";
     return;
   }
 
-  // Validazione Doppia Password (SOLO in Registrazione)
   if (!isModifica.value && form.value.password !== form.value.confermaPassword) {
     errorMessage.value = "Le password non coincidono!";
     return;
@@ -139,7 +135,7 @@ const salvaDipendente = async () => {
         cognome: form.value.cognome,
         data_nascita: form.value.data_nascita,
         email: form.value.email,
-        password: form.value.password // Se è vuota, il backend mantiene quella vecchia grazie alla tua logica in Java!
+        password: form.value.password
       })
     } else {
       await api.post('/api/auth/registrati', {
@@ -164,7 +160,7 @@ const salvaDipendente = async () => {
 // 5. ELIMINAZIONE
 // ==========================================
 const eliminaDipendente = async (id) => {
-  if (confirm("Sei sicuro di voler eliminare questo dipendente?")) {
+  if (confirm("Sei sicuro di voler eliminare questo amministratore?")) {
     try {
       await api.delete(`/api/auth/elimina/${id}`)
       caricaDipendenti()
@@ -176,27 +172,35 @@ const eliminaDipendente = async (id) => {
 </script>
 
 <template>
-  <div class="dashboard-layout">
+  <div class="glass-dashboard-layout">
+    <div class="glass-bg-blob blob-1"></div>
+    <div class="glass-bg-blob blob-2"></div>
+    <div class="glass-bg-blob blob-3"></div>
 
     <AdminSidebar />
 
-    <div class="main-content">
-
-      <header class="topbar">
-        <div class="header-left">
-          <div class="divider"></div>
-          <h1>Gestione Amministratori</h1>
+    <main class="main-content">
+      <header class="glass-topbar">
+        <div class="topbar-left">
+          <span class="greeting">Gestione Operativa</span>
+          <h1>Amministratori</h1>
         </div>
-        <button @click="apriModaleAggiungi" class="btn-primary">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
-          Nuovo Amministratore
-        </button>
+        <div class="topbar-right">
+          <div class="user-profile">
+            <div class="avatar">{{ nomeUtente.charAt(0) }}</div>
+            <span>{{ nomeUtente }}</span>
+          </div>
+          <button @click="apriModaleAggiungi" class="btn-primary-glass">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
+            Nuovo Admin
+          </button>
+        </div>
       </header>
 
-      <main class="content-area">
-        <div class="card">
-          <div class="table-container">
-            <table class="data-table">
+      <div class="content-area">
+        <div class="glass-card table-card">
+          <div class="table-responsive">
+            <table class="glass-table">
               <thead>
               <tr>
                 <th>ID</th>
@@ -209,239 +213,222 @@ const eliminaDipendente = async (id) => {
               </thead>
               <tbody>
               <tr v-for="dipendente in utenti" :key="dipendente.id">
-                <td class="text-muted">#{{ dipendente.id }}</td>
-                <td class="font-medium">{{ dipendente.nome }} {{ dipendente.cognome }}</td>
+                <td class="id-cell">#{{ dipendente.id }}</td>
+                <td class="desc-cell">{{ dipendente.nome }} {{ dipendente.cognome }}</td>
                 <td>{{ dipendente.data_nascita ? new Date(dipendente.data_nascita).toLocaleDateString('it-IT') : '-' }}</td>
-                <td class="text-muted">{{ dipendente.email }}</td>
+                <td style="color:#64748b">{{ dipendente.email }}</td>
                 <td>
-                  <span class="badge" :class="dipendente.ruolo?.nomeRuolo === 'Admin' ? 'badge-admin' : 'badge-user'">
+                  <span class="glass-badge badge-admin">
                     {{ dipendente.ruolo ? dipendente.ruolo.nomeRuolo : 'Nessuno' }}
                   </span>
                 </td>
                 <td class="actions-col">
-                  <button @click="apriModaleModifica(dipendente)" class="btn-icon edit" title="Modifica">
+                  <button @click="apriModaleModifica(dipendente)" class="btn-icon-glass edit" title="Modifica">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                   </button>
-                  <button @click="eliminaDipendente(dipendente.id)" class="btn-icon delete" title="Elimina">
+                  <button @click="eliminaDipendente(dipendente.id)" class="btn-icon-glass delete" title="Elimina">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                   </button>
                 </td>
               </tr>
               <tr v-if="utenti.length === 0">
-                <td colspan="6" class="empty-state">
-                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-                  <p>Nessun utente nel sistema.</p>
+                <td colspan="6">
+                  <div class="empty-state-glass">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                    <p>Nessun amministratore nel sistema.</p>
+                  </div>
                 </td>
               </tr>
               </tbody>
             </table>
           </div>
         </div>
-      </main>
-
-    </div> <div v-if="mostraModale" class="modal-overlay">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2>{{ isModifica ? 'Modifica Anagrafica' : 'Registra Admin' }}</h2>
-        <button @click="chiudiModale" class="btn-close">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-        </button>
       </div>
+    </main>
 
-      <div class="form-body">
-        <div class="form-row">
-          <div class="form-group half">
-            <label>Nome</label>
-            <input v-model="form.nome" type="text" placeholder="Mario" />
-          </div>
-          <div class="form-group half">
-            <label>Cognome</label>
-            <input v-model="form.cognome" type="text" placeholder="Rossi" />
-          </div>
+    <div v-if="mostraModale" class="modal-overlay">
+      <div class="glass-modal">
+        <div class="modal-header">
+          <h2>{{ isModifica ? 'Modifica Anagrafica' : 'Registra Admin' }}</h2>
+          <button @click="chiudiModale" class="btn-close-glass">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
         </div>
 
-        <div class="form-group">
-          <label>Data di Nascita</label>
-          <input v-model="form.data_nascita" type="date" />
-        </div>
-
-        <div class="form-group">
-          <label>Email aziendale</label>
-          <input v-model="form.email" type="email" placeholder="mario.rossi@wms.it" />
-        </div>
-
-        <template v-if="!isModifica">
+        <div class="form-body">
           <div class="form-row">
             <div class="form-group half">
-              <label>Password</label>
-              <input v-model="form.password" type="password" placeholder="••••••••" />
+              <label>Nome</label>
+              <input v-model="form.nome" type="text" class="glass-input" placeholder="Mario" />
             </div>
             <div class="form-group half">
-              <label>Conferma Password</label>
-              <input v-model="form.confermaPassword" type="password" placeholder="••••••••" />
+              <label>Cognome</label>
+              <input v-model="form.cognome" type="text" class="glass-input" placeholder="Rossi" />
             </div>
           </div>
+
           <div class="form-group">
-            <label>Ruolo di sistema assegnato</label>
-            <div class="role-badge fixed-role-admin">
-              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
-              <span>Amministratore (Admin)</span>
-            </div>
+            <label>Data di Nascita</label>
+            <input v-model="form.data_nascita" type="date" class="glass-input" />
           </div>
-        </template>
 
-        <template v-if="isModifica">
-          <div class="security-box" :class="{ 'is-unlocked': isPasswordUnlocked, 'is-verifying': staVerificandoAdmin }">
+          <div class="form-group">
+            <label>Email aziendale</label>
+            <input v-model="form.email" type="email" class="glass-input" placeholder="admin@wms.it" />
+          </div>
 
-            <div v-if="!isPasswordUnlocked && !staVerificandoAdmin" class="locked-state">
-              <div class="security-info">
-                <svg class="icon-lock" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
-                <div>
-                  <h4>Sicurezza Account</h4>
-                  <p>La modifica della password è protetta.</p>
+          <template v-if="!isModifica">
+            <div class="form-row">
+              <div class="form-group half">
+                <label>Password</label>
+                <input v-model="form.password" type="password" class="glass-input" placeholder="••••••••" />
+              </div>
+              <div class="form-group half">
+                <label>Conferma Password</label>
+                <input v-model="form.confermaPassword" type="password" class="glass-input" placeholder="••••••••" />
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Ruolo di sistema assegnato</label>
+              <div class="role-badge fixed-role-admin">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+                <span>Amministratore (Admin)</span>
+              </div>
+            </div>
+          </template>
+
+          <template v-if="isModifica">
+            <div class="security-box" :class="{ 'is-unlocked': isPasswordUnlocked, 'is-verifying': staVerificandoAdmin }">
+
+              <div v-if="!isPasswordUnlocked && !staVerificandoAdmin" class="locked-state">
+                <div class="security-info">
+                  <svg class="icon-lock" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                  <div>
+                    <h4>Sicurezza Account</h4>
+                    <p>La modifica della password è protetta.</p>
+                  </div>
+                </div>
+                <button @click="staVerificandoAdmin = true" class="btn-unlock-glass">Sblocca</button>
+              </div>
+
+              <div v-if="staVerificandoAdmin" class="verify-state">
+                <label>Conferma la tua identità Admin</label>
+                <input v-model="adminPassword" type="password" class="glass-input-warning" placeholder="Inserisci la tua password..." />
+                <div class="verify-actions">
+                  <button @click="staVerificandoAdmin = false" class="btn-ghost small">Annulla</button>
+                  <button @click="sbloccaCambioPassword" class="btn-warning-glass small">Verifica</button>
                 </div>
               </div>
-              <button @click="staVerificandoAdmin = true" class="btn-unlock">Sblocca</button>
-            </div>
 
-            <div v-if="staVerificandoAdmin" class="verify-state">
-              <label>Conferma la tua identità Admin</label>
-              <input v-model="adminPassword" type="password" placeholder="Inserisci la tua password..." />
-              <div class="verify-actions">
-                <button @click="staVerificandoAdmin = false" class="btn-ghost small">Annulla</button>
-                <button @click="sbloccaCambioPassword" class="btn-primary small">Verifica</button>
+              <div v-if="isPasswordUnlocked" class="unlocked-state">
+                <div class="security-info success">
+                  <svg class="icon-unlock" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"></path></svg>
+                  <label>Imposta nuova password</label>
+                </div>
+                <input v-model="form.password" type="password" class="glass-input-success" placeholder="Lascia vuoto per non cambiare" />
               </div>
             </div>
+          </template>
 
-            <div v-if="isPasswordUnlocked" class="unlocked-state">
-              <div class="security-info success">
-                <svg class="icon-unlock" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"></path></svg>
-                <label>Imposta nuova password</label>
-              </div>
-              <input v-model="form.password" type="password" placeholder="Lascia vuoto per non cambiare" />
-            </div>
+          <div v-if="errorMessage" class="error-banner">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            {{ errorMessage }}
           </div>
-        </template>
+        </div>
 
-        <div v-if="errorMessage" class="error-banner">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-          {{ errorMessage }}
+        <div class="modal-actions">
+          <button @click="chiudiModale" class="btn-ghost">Annulla</button>
+          <button @click="salvaDipendente" class="btn-success-glass">Salva Admin</button>
         </div>
       </div>
-
-      <div class="modal-actions">
-        <button @click="chiudiModale" class="btn-secondary">Annulla</button>
-        <button @click="salvaDipendente" class="btn-success">Salva Dipendente</button>
-      </div>
     </div>
-  </div>
-
   </div>
 </template>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
-/* ------- LAYOUT BASE ------- */
-.page-layout { height: 100vh; background-color: #f8fafc; display: flex; flex-direction: column; margin: 0; font-family: 'Inter', sans-serif; color: #334155; }
+/* ------- LAYOUT & BACKGROUND CHIARO (Uniformato) ------- */
+.glass-dashboard-layout { display: flex; height: 100vh; width: 100vw; background-color: #e2e8f0; font-family: 'Inter', sans-serif; margin: 0; color: #1e293b; position: relative; overflow: hidden; }
+.glass-bg-blob { position: absolute; border-radius: 50%; filter: blur(80px); z-index: 0; opacity: 0.6; }
+.blob-1 { top: -10%; left: -10%; width: 500px; height: 500px; background: #93c5fd; }
+.blob-2 { bottom: -20%; right: -10%; width: 600px; height: 600px; background: #c4b5fd; }
+.blob-3 { top: 40%; left: 40%; width: 400px; height: 400px; background: #86efac; opacity: 0.4; }
 
-/* ------- TOPBAR ------- */
-.topbar { background: white; padding: 20px 40px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; }
-.header-left { display: flex; align-items: center; gap: 16px; }
-.divider { width: 1px; height: 24px; background-color: #e2e8f0; }
-.topbar h1 { margin: 0; font-size: 20px; font-weight: 700; color: #0f172a; letter-spacing: -0.5px; }
+.main-content { flex-grow: 1; display: flex; flex-direction: column; overflow-y: auto; z-index: 10; }
 
-/*------sidebar------*/
-.dashboard-layout {
-  display: flex;
-  flex-direction: row; /* Mette Sidebar e Main Content uno di fianco all'altro */
-  height: 100vh;
-  width: 100vw;
-  background-color: #f8fafc;
-  margin: 0;
-  font-family: 'Inter', sans-serif;
-  color: #334155;
-  overflow: hidden; /* Blocca lo scroll dell'intera pagina... */
-}
+/* ------- TOPBAR CHIARA (Uguale a GestioneTask) ------- */
+.glass-topbar { background: rgba(255, 255, 255, 0.4); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); padding: 20px 40px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.3); }
+.topbar-right { display: flex; align-items: center; gap: 24px; }
+.greeting { font-size: 14px; color: #64748b; font-weight: 500; }
+.topbar-left h1 { margin: 4px 0 0 0; font-size: 24px; font-weight: 700; color: #0f172a; letter-spacing: -0.5px; }
 
-.main-content {
-  flex-grow: 1;
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto; /* ...e fa scorrere solo la parte destra! */
-  height: 100vh;
-}
+.user-profile { display: flex; align-items: center; gap: 12px; font-weight: 600; color: #0f172a; }
+.avatar { width: 44px; height: 44px; background: linear-gradient(135deg, #6366f1, #a855f7); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 18px; box-shadow: 0 4px 10px rgba(99, 102, 241, 0.3); }
 
-.btn-back { background: transparent; border: none; font-size: 14px; font-weight: 500; cursor: pointer; color: #64748b; display: flex; align-items: center; gap: 6px; padding: 8px; border-radius: 8px; transition: all 0.2s; }
-.btn-back svg { width: 18px; height: 18px; }
-.btn-back:hover { background-color: #f1f5f9; color: #0f172a; }
+.btn-primary-glass { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; border: none; padding: 10px 20px; border-radius: 12px; cursor: pointer; font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; transition: all 0.3s; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3); }
+.btn-primary-glass svg { width: 18px; height: 18px; }
+.btn-primary-glass:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4); }
 
-/* ------- BOTTONI ------- */
-.btn-primary { background-color: #6366f1; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; transition: background 0.2s, box-shadow 0.2s; box-shadow: 0 4px 6px -1px rgba(99, 102, 241, 0.2); }
-.btn-primary:hover { background-color: #4f46e5; box-shadow: 0 6px 8px -1px rgba(99, 102, 241, 0.3); }
-.btn-primary.small { padding: 8px 16px; font-size: 13px; }
+.content-area { padding: 40px; max-width: 1200px; margin: 0 auto; width: 100%; box-sizing: border-box;}
 
-.btn-secondary { background: white; color: #475569; border: 1px solid #cbd5e1; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; transition: all 0.2s; }
-.btn-secondary:hover { background: #f8fafc; border-color: #94a3b8; color: #0f172a; }
+/* ------- IL VETRO CHIARO (CARD DELLA TABELLA) ------- */
+.glass-card { background: rgba(255, 255, 255, 0.65); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.5); box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.1); border-radius: 20px; }
+.table-card { overflow: hidden; padding: 0; }
 
-.btn-success { background-color: #10b981; color: white; border: none; padding: 10px 24px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; transition: background 0.2s, box-shadow 0.2s; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.2); }
-.btn-success:hover { background-color: #059669; }
+/* Tabella Glass */
+.table-responsive { width: 100%; overflow-x: auto; }
+.glass-table { width: 100%; border-collapse: collapse; text-align: left; }
+.glass-table th { padding: 16px 24px; font-size: 13px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid rgba(0,0,0,0.05); }
+.glass-table td { padding: 16px 24px; border-bottom: 1px solid rgba(0,0,0,0.03); color: #334155; font-size: 14px; vertical-align: middle; }
+.glass-table tbody tr:hover { background: rgba(255,255,255,0.4); }
+.glass-table tbody tr:last-child td { border-bottom: none; }
 
-.btn-ghost { background: transparent; border: none; color: #64748b; font-weight: 500; font-size: 13px; cursor: pointer; padding: 8px 16px; border-radius: 6px; transition: all 0.2s; }
-.btn-ghost:hover { background: #f1f5f9; color: #0f172a; }
+.id-cell { color: #64748b; font-family: monospace; font-weight: 600; }
+.desc-cell { color: #0f172a; font-weight: 600; }
 
-/* ------- TABELLA ------- */
-.content-area { padding: 40px; flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; align-items: center; }
-.card { background: white; width: 100%; max-width: 1200px; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02); overflow: hidden; }
-.table-container { width: 100%; overflow-x: auto; }
-.data-table { width: 100%; border-collapse: collapse; text-align: left; }
-.data-table th { background-color: #f8fafc; color: #64748b; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; padding: 16px 24px; border-bottom: 1px solid #e2e8f0; }
-.data-table td { padding: 16px 24px; border-bottom: 1px solid #f1f5f9; font-size: 14px; vertical-align: middle; }
-.data-table tr:hover td { background-color: #f8fafc; }
-.data-table tr:last-child td { border-bottom: none; }
-
-.font-medium { font-weight: 600; color: #0f172a; }
-.text-muted { color: #64748b; }
 .actions-col { text-align: right; }
-
-.btn-icon { background: white; border: 1px solid #e2e8f0; color: #64748b; cursor: pointer; width: 32px; height: 32px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; margin-left: 8px; transition: all 0.2s; }
-.btn-icon svg { width: 16px; height: 16px; }
-.btn-icon:hover { border-color: #cbd5e1; color: #0f172a; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-.btn-icon.delete:hover { color: #ef4444; border-color: #fca5a5; background-color: #fef2f2; }
+.btn-icon-glass { background: rgba(255,255,255,0.5); border: 1px solid rgba(255,255,255,0.6); color: #64748b; cursor: pointer; width: 32px; height: 32px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; margin-left: 8px; transition: all 0.2s; }
+.btn-icon-glass svg { width: 16px; height: 16px; }
+.btn-icon-glass:hover { background: rgba(255,255,255,0.9); color: #0f172a; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+.btn-icon-glass.delete:hover { color: #ef4444; border-color: rgba(239, 68, 68, 0.3); background-color: rgba(239, 68, 68, 0.1); }
 
 /* Badges */
-.badge { padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
-.badge-admin { background-color: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
-.badge-user { background-color: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+.glass-badge { padding: 6px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; border: 1px solid rgba(255,255,255,0.5); backdrop-filter: blur(4px); }
+.badge-admin { background-color: rgba(16, 185, 129, 0.15); color: #059669; border-color: rgba(16, 185, 129, 0.3); }
 
-.empty-state { text-align: center; color: #94a3b8; padding: 60px 20px !important; }
-.empty-state svg { width: 48px; height: 48px; margin-bottom: 16px; opacity: 0.5; }
-.empty-state p { margin: 0; font-weight: 500; }
+.empty-state-glass { padding: 60px 0; color: #64748b; text-align: center; display: flex; flex-direction: column; align-items: center; }
+.empty-state-glass svg { width: 48px; height: 48px; margin-bottom: 16px; opacity: 0.5; }
+.empty-state-glass p { margin: 0; font-size: 15px; }
 
-/* ------- MODALE  ------- */
-.modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(4px); display: flex; justify-content: center; align-items: center; z-index: 1000; }
-.modal-content { background: white; border-radius: 16px; width: 100%; max-width: 500px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); display: flex; flex-direction: column; max-height: 90vh; }
-.modal-header { padding: 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; }
+/* ------- MODALE GLASS CHIARA ------- */
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15,23,42,0.4); backdrop-filter: blur(8px); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+.glass-modal { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,0.8); border-radius: 20px; width: 100%; max-width: 480px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.2); display: flex; flex-direction: column; max-height: 90vh; }
+.modal-header { padding: 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(0,0,0,0.05); }
 .modal-header h2 { margin: 0; font-size: 18px; font-weight: 700; color: #0f172a; }
-.btn-close { background: transparent; border: none; color: #94a3b8; cursor: pointer; padding: 4px; border-radius: 6px; transition: all 0.2s; }
-.btn-close svg { width: 24px; height: 24px; }
-.btn-close:hover { background: #f1f5f9; color: #0f172a; }
+.btn-close-glass { background: transparent; border: none; color: #64748b; cursor: pointer; padding: 6px; border-radius: 8px; transition: 0.2s; }
+.btn-close-glass:hover { background: rgba(0,0,0,0.05); color: #ef4444; }
 
 .form-body { padding: 24px; overflow-y: auto; }
 .form-row { display: flex; gap: 16px; }
 .form-group { margin-bottom: 20px; width: 100%; }
 .form-group.half { width: 50%; }
-.form-group label { display: block; font-weight: 600; margin-bottom: 8px; color: #334155; font-size: 13px; }
+.form-group label { display: block; font-weight: 600; margin-bottom: 8px; color: #475569; font-size: 13px; }
 
-/* Inputs Stripe-style */
-.form-group input, .form-group select { width: 100%; padding: 12px 16px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; font-family: 'Inter', sans-serif; transition: all 0.2s; color: #0f172a; box-sizing: border-box; background-color: #fff; }
-.form-group input::placeholder { color: #94a3b8; }
-.form-group input:focus, .form-group select:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15); }
+.glass-input { width: 100%; padding: 12px 16px; border-radius: 12px; background: rgba(255, 255, 255, 0.6); border: 1px solid rgba(255,255,255,0.4); color: #0f172a; font-size: 13px; outline: none; box-sizing: border-box; transition: all 0.2s; }
+.glass-input::placeholder { color: #94a3b8; }
+.glass-input:focus { border-color: #6366f1; background: rgba(255, 255, 255, 0.9); box-shadow: 0 0 0 3px rgba(99,102,241,0.15); }
 
-/* ------- CONTROLLO SICUREZZA ------- */
-.security-box { background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-top: 10px; transition: all 0.3s ease; }
-.security-box.is-unlocked { background-color: #f0fdf4; border-color: #bbf7d0; }
-.security-box.is-verifying { background-color: #fffbeb; border-color: #fde68a; }
+/* Modificatori Input per Sicurezza */
+.glass-input-warning { width: 100%; padding: 12px 16px; border-radius: 12px; background: rgba(254, 243, 199, 0.5); border: 1px solid rgba(245, 158, 11, 0.5); color: #0f172a; font-size: 13px; outline: none; box-sizing: border-box; margin-bottom: 12px;}
+.glass-input-warning:focus { background: white; border-color: #f59e0b; box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15); }
+.glass-input-success { width: 100%; padding: 12px 16px; border-radius: 12px; background: rgba(209, 250, 229, 0.5); border: 1px solid rgba(16, 185, 129, 0.5); color: #0f172a; font-size: 13px; outline: none; box-sizing: border-box; }
+.glass-input-success:focus { background: white; border-color: #10b981; box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15); }
+
+/* Box Sicurezza */
+.security-box { background: rgba(255,255,255,0.4); border: 1px solid rgba(0,0,0,0.05); border-radius: 16px; padding: 20px; margin-top: 10px; transition: all 0.3s ease; }
+.security-box.is-unlocked { background: rgba(16, 185, 129, 0.05); border-color: rgba(16, 185, 129, 0.2); }
+.security-box.is-verifying { background: rgba(245, 158, 11, 0.05); border-color: rgba(245, 158, 11, 0.2); }
 
 .locked-state { display: flex; justify-content: space-between; align-items: center; }
 .security-info { display: flex; align-items: center; gap: 12px; }
@@ -449,28 +436,27 @@ const eliminaDipendente = async (id) => {
 .security-info h4 { margin: 0 0 4px 0; font-size: 14px; color: #0f172a; }
 .security-info p { margin: 0; font-size: 12px; color: #64748b; }
 
-.btn-unlock { background-color: white; color: #0f172a; border: 1px solid #cbd5e1; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.2s; }
-.btn-unlock:hover { border-color: #94a3b8; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+.btn-unlock-glass { background: rgba(255,255,255,0.6); color: #0f172a; border: 1px solid rgba(0,0,0,0.1); padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.2s; }
+.btn-unlock-glass:hover { background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
 
 .verify-state label { display: block; font-size: 13px; font-weight: 600; color: #b45309; margin-bottom: 12px; }
-.verify-state input { width: 100%; padding: 10px 16px; border: 1px solid #fcd34d; border-radius: 8px; margin-bottom: 16px; outline: none; transition: box-shadow 0.2s; box-sizing: border-box;}
-.verify-state input:focus { box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.2); }
 .verify-actions { display: flex; gap: 12px; justify-content: flex-end; }
+.btn-warning-glass { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 13px; cursor: pointer; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);}
 
 .unlocked-state { display: flex; flex-direction: column; gap: 12px; }
 .security-info.success .icon-unlock { width: 20px; height: 20px; color: #059669; }
 .unlocked-state label { font-size: 13px; font-weight: 600; color: #059669; }
-.unlocked-state input { border-color: #6ee7b7; box-sizing: border-box;}
-.unlocked-state input:focus { box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15); border-color: #10b981; }
 
-.error-banner { margin-top: 16px; padding: 12px 16px; background-color: #fef2f2; border-left: 4px solid #ef4444; border-radius: 6px; display: flex; align-items: center; gap: 12px; color: #b91c1c; font-size: 13px; font-weight: 500; }
-.error-banner svg { width: 20px; height: 20px; }
+.error-banner { margin-top: 16px; padding: 12px 16px; background: rgba(239,68,68,0.1); border-left: 4px solid #ef4444; border-radius: 6px; color: #b91c1c; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px;}
+.error-banner svg { width: 20px; height: 20px; flex-shrink: 0;}
 
-.modal-actions { padding: 20px 24px; border-top: 1px solid #e2e8f0; background: #f8fafc; display: flex; justify-content: flex-end; gap: 12px; border-radius: 0 0 16px 16px; }
+.modal-actions { padding: 20px 24px; border-top: 1px solid rgba(0,0,0,0.05); background: rgba(248, 250, 252, 0.6); display: flex; justify-content: flex-end; gap: 12px; border-radius: 0 0 20px 20px; }
+.btn-ghost { background: transparent; color: #64748b; border: 1px solid rgba(0,0,0,0.1); padding: 10px 20px; border-radius: 12px; cursor: pointer; font-weight: 600; font-size: 14px; transition: 0.2s;}
+.btn-ghost:hover { background: rgba(0,0,0,0.05); color: #0f172a;}
+.btn-success-glass { background: linear-gradient(135deg, #10b981, #059669); color: white; border: none; padding: 10px 24px; border-radius: 12px; cursor: pointer; font-weight: 600; font-size: 14px; transition: 0.3s; box-shadow: 0 4px 15px rgba(16,185,129,0.3);}
+.btn-success-glass:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(16,185,129,0.4); }
 
-/* ------- BADGE RUOLO FISSO NEL FORM ------- */
-.role-badge { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 8px; font-weight: 600; font-size: 14px; }
+.role-badge { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 12px; font-weight: 600; font-size: 14px; }
 .role-badge svg { width: 20px; height: 20px; }
-.fixed-role-user { background-color: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
-.fixed-role-admin { background-color: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+.fixed-role-admin { background-color: rgba(16, 185, 129, 0.1); color: #059669; border: 1px solid rgba(16, 185, 129, 0.2); }
 </style>
