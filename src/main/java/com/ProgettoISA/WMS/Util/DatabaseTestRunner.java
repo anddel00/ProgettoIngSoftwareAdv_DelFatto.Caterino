@@ -161,50 +161,69 @@ public class DatabaseTestRunner implements CommandLineRunner {
     }
 
 
-    // 5. Gestione Reparti con controllo di esistenza e salvataggio in batch
-    if(repartiRepository.findAll().isEmpty())
-        {
-            List<Reparti> repartiIniziali = List.of(
-                new Reparti(15L, 15L, -20L, "Surgelati"), // Reparto Surgelati
-                new Reparti(20L, 20L, 3L, "Fresco"), // Reparto Freschi
-                new Reparti(30L, 30L, 15L, "Secco") // Reparto Secchi
-            );
+    // 5. Gestione Reparti con le dimensioni originali
+    if(repartiRepository.findAll().isEmpty()) {
+        List<Reparti> repartiIniziali = List.of(
+            new Reparti(15L, 15L, -20L, "Surgelati"), // Dispari -> Corridoio 3
+            new Reparti(20L, 20L, 3L, "Fresco"),      // Pari -> Corridoio 2
+            new Reparti(30L, 30L, 15L, "Secco")       // Pari -> Corridoio 2
+        );
 
-            repartiRepository.saveAll(repartiIniziali);
-            System.out.println("✅ Reparti inizializzati con successo!");
+        repartiRepository.saveAll(repartiIniziali);
+        System.out.println("✅ Reparti inizializzati con successo!");
+        
+        // 6 & 7. Generazione Automatica Scaffali e Mappa (Griglia Simmetrica Dinamica)
+        if(scaffaliRepository.findAll().isEmpty() && mappaRepository.findAll().isEmpty()) {
             
-            // 6. Gestione Scaffali con controllo di esistenza e salvataggio in batch
-            if(scaffaliRepository.findAll().isEmpty())
-                {
-                    List<Scaffali> scaffaliIniziali = new ArrayList<>();
-                        for(int i=0; i<3; i++) // ciclo per dare un tipo di scaffale per ogni reparto base creato.
-                        {
-                            scaffaliIniziali.add(new Scaffali(5, 1, 2, 2000)); //scaffale standard
-                            scaffaliIniziali.add(new Scaffali(2, 2, 3, 2000)); //scaffale chubby
-                            scaffaliIniziali.add(new Scaffali(5, 2, 3, 3000));  //scaffale grande
-                        }
-                    scaffaliRepository.saveAll(scaffaliIniziali);
-                    System.out.println("✅ Scaffali inizializzati con successo!");
+            List<Mappa> mappeDaSalvare = new ArrayList<>();
+            int spazioVerticale = 1;
+            int altezzaScaffaleY = 1; // Occupazione sulla Y
 
-                    // 7. Gestione Mappa con controllo di esistenza e salvataggio in batch
-                    if(mappaRepository.findAll().isEmpty())
-                    {
-                        List<Mappa> mappeIniziali = new ArrayList<>();
-                        for(int i=0; i<repartiIniziali.size(); i++)
-                        {
-                           mappeIniziali.add(new Mappa(repartiIniziali.get(i), scaffaliIniziali.get(0), 0, 0, "VERTICALE"));
-                           mappeIniziali.add(new Mappa(repartiIniziali.get(i), scaffaliIniziali.get(1), repartiIniziali.get(i).getMaxX().intValue()-2, 0, "VERTICALE"));
-                           mappeIniziali.add(new Mappa(repartiIniziali.get(i), scaffaliIniziali.get(2), 0, repartiIniziali.get(i).getMaxY().intValue()-5, "ORIZZONTALE"));
-                           for(int j=0; j<3; j++)
-                           {
-                                scaffaliIniziali.remove(0); // rimuoviamo gli scaffali già mappati per evitare duplicati
-                           }
-                        }
-                        mappaRepository.saveAll(mappeIniziali);
-                        System.out.println("✅ Mappa inizializzata con successo!");
-                    }
+            for (Reparti reparto : repartiIniziali) {
+                
+                // IL TUO ALGORITMO: Calcolo dinamico del corridoio
+                int corridoioCentrale = (reparto.getMaxX() % 2 == 0) ? 2 : 3;
+                
+                // Calcolo larghezza simmetrica esatta
+                int larghezzaScaffale = (int) (reparto.getMaxX() - corridoioCentrale) / 2;
+                
+                // Creiamo un tipo di scaffale specifico per le dimensioni calcolate
+                Scaffali templateScaffale = scaffaliRepository.save(
+                    new Scaffali(larghezzaScaffale, 1, 3, 3000) 
+                );
+
+                System.out.println("🧱 Generazione griglia per " + reparto.getNome() + 
+                                   " | MaxX: " + reparto.getMaxX() + 
+                                   " | Corridoio: " + corridoioCentrale + 
+                                   " | Larghezza scaffali: " + larghezzaScaffale);
+
+                // Ciclo sulla coordinata Y
+                for (int y = 0; y <= (reparto.getMaxY() - 1); y += 2) {
+                    
+                    // 1. Scaffale a SINISTRA (parte da X=0)
+                    mappeDaSalvare.add(new Mappa(
+                        reparto, 
+                        templateScaffale, 
+                        0, 
+                        y, 
+                        "ORIZZONTALE"
+                    ));
+
+                    // 2. Scaffale a DESTRA (parte dopo il corridoio)
+                    int coordinataXDestra = larghezzaScaffale + corridoioCentrale;
+                    mappeDaSalvare.add(new Mappa(
+                        reparto, 
+                        templateScaffale, 
+                        coordinataXDestra, 
+                        y, 
+                        "ORIZZONTALE"
+                    ));
                 }
-        }   
+            }
+            mappaRepository.saveAll(mappeDaSalvare);
+            System.out.println("✅ Mappa e Scaffali generati con corridoio dinamico!");
+        }
+    }
     
         // 8. Creazione Utente Admin tramite Service (che gestisce BCrypt)
         try {

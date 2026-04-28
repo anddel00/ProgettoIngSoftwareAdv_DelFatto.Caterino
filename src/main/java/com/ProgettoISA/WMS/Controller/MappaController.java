@@ -5,8 +5,6 @@ import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -17,6 +15,7 @@ import com.ProgettoISA.WMS.Service.MappaService;
 @RequestMapping("/api/mappa")
 @CrossOrigin(origins = "*") 
 public class MappaController {
+    
     private final MappaService mappaService;
 
     public MappaController(MappaService mappaService) {
@@ -29,22 +28,6 @@ public class MappaController {
             List<MappaDTO> mappa = mappaService.getTuttaLaMappa();
             return ResponseEntity.ok(mappa);
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().build();
-        }
-    }
-
-    @PostMapping("/salva-posizioni")
-    public ResponseEntity<?> salva(@RequestBody List<MappaDTO> mappaDTOs) {
-        try {
-            mappaService.salvaPosizioni(mappaDTOs);
-            return ResponseEntity.ok().build();
-            
-        } catch (IllegalArgumentException e) {
-            // Se l'errore è "Dati Sbagliati" (Collisioni, Bordi), restituiamo 400!
-            return ResponseEntity.badRequest().body(e.getMessage());
-            
-        } catch (Exception e) {
-            // Per tutti gli altri disastri veri, restituiamo 500
             return ResponseEntity.internalServerError().build();
         }
     }
