@@ -14,6 +14,7 @@ import com.ProgettoISA.WMS.Repository.MappaRepository;
 import com.ProgettoISA.WMS.Repository.RepartiRepository;
 import com.ProgettoISA.WMS.Repository.ScaffaliRepository;
 
+
 @Service
 public class MappaService {
 
@@ -21,7 +22,6 @@ public class MappaService {
     private final RepartiRepository repartiRepository;
     private final ScaffaliRepository scaffaliRepository;
 
-    // Iniettiamo tutte le repository necessarie
     public MappaService(MappaRepository mappaRepository, RepartiRepository repartiRepository, ScaffaliRepository scaffaliRepository) {
         this.mappaRepository = mappaRepository;
         this.repartiRepository = repartiRepository;
@@ -41,7 +41,6 @@ public class MappaService {
         )).collect(Collectors.toList());
     }
 
-    // @Transactional: se si rompe qualcosa a metà, annulla tutto
     @Transactional 
     public void salvaPosizioni(List<MappaDTO> mappaDTOs) {
         
@@ -58,37 +57,43 @@ public class MappaService {
                 .orElseThrow(() -> new RuntimeException("Scaffale non trovato"));
 
             // ---------------------------------------------------------
-            // 2. VALIDAZIONE COLLISIONI E AREA DI RISPETTO (AABB)
+            // 2a. VALIDAZIONE LIMITI REPARTO (Bordi mappa)
             // ---------------------------------------------------------
             
-            // Recupero tutti gli altri scaffali presenti in questo reparto per fare il confronto
-            // (Assicurati di avere questo metodo nel tuo MappaRepository)
-            List<Mappa> scaffaliNelReparto = mappaRepository.findByRepartoId(reparto.getId());
-            
-            // Calcolo l'ingombro del MIO scaffale (quello che sto cercando di salvare)
             boolean nuovoIsOrizzontale = dto.getOrientamentoScaffale().equals("ORIZZONTALE");
             int spanX = nuovoIsOrizzontale ? scaffaleNuovo.getMax_righe() : scaffaleNuovo.getMax_colonne();
             int spanY = nuovoIsOrizzontale ? scaffaleNuovo.getMax_colonne() : scaffaleNuovo.getMax_righe();
 
+            if (dto.getCoordinataX() < 0 || dto.getCoordinataY() < 0) {
+                throw new IllegalArgumentException("Posizione non valida: lo scaffale non può avere coordinate negative.");
+            }
+
+            if (dto.getCoordinataX() + spanX > reparto.getMaxX() || 
+                dto.getCoordinataY() + spanY > reparto.getMaxY()) {
+                throw new IllegalArgumentException("Spazio insufficiente: lo scaffale esce dai bordi del reparto.");
+            }
+
+            // ---------------------------------------------------------
+            // 2b. VALIDAZIONE COLLISIONI E AREA DI RISPETTO (AABB)
+            // ---------------------------------------------------------
+            
+            List<Mappa> scaffaliNelReparto = mappaRepository.findByRepartoId(reparto.getId());
+            
             int nuovoSinistra = dto.getCoordinataX();
             int nuovoDestra = dto.getCoordinataX() + spanX;
             int nuovoSopra = dto.getCoordinataY();
             int nuovoSotto = dto.getCoordinataY() + spanY;
 
-            // Controllo il mio scaffale contro ogni singolo scaffale già piazzato
             for (Mappa altro : scaffaliNelReparto) {
                 
-                // Se sto confrontando lo scaffale con se stesso (stesso ID), salto il giro
                 if (altro.getId() == dto.getId()) {
                     continue;
                 }
 
-                // Calcolo l'ingombro dello scaffale "nemico"
                 boolean altroIsOrizzontale = altro.getOrientamentoScaffale().equals("ORIZZONTALE");
                 int altroSpanX = altroIsOrizzontale ? altro.getScaffale().getMax_righe() : altro.getScaffale().getMax_colonne();
                 int altroSpanY = altroIsOrizzontale ? altro.getScaffale().getMax_colonne() : altro.getScaffale().getMax_righe();
 
-                // Aggiungo 1 blocco di buffer per lo spazio vitale dei muletti
                 int buffer = 1; 
 
                 int altroSinistra = altro.getX() - buffer;
@@ -96,17 +101,16 @@ public class MappaService {
                 int altroSopra = altro.getY() - buffer;
                 int altroSotto = altro.getY() + altroSpanY + buffer;
 
-                // Logica AABB: cerco di dimostrare che NON si toccano
                 boolean nonSiToccano = (
-                    nuovoSinistra >= altroDestra || // Sono tutto a destra
-                    nuovoDestra <= altroSinistra || // Sono tutto a sinistra
-                    nuovoSopra >= altroSotto ||     // Sono tutto sotto
-                    nuovoSotto <= altroSopra        // Sono tutto sopra
+                    nuovoSinistra >= altroDestra || 
+                    nuovoDestra <= altroSinistra || 
+                    nuovoSopra >= altroSotto ||     
+                    nuovoSotto <= altroSopra        
                 );
 
-                // Se non è vero che "non si toccano", allora c'è un incidente!
                 if (!nonSiToccano) {
-                    throw new RuntimeException("Spazio insufficiente! Lo scaffale in posizione X:" 
+                    // Usa IllegalArgumentException qui!
+                    throw new IllegalArgumentException("Spazio insufficiente! Lo scaffale in posizione X:" 
                         + dto.getCoordinataX() + " Y:" + dto.getCoordinataY() 
                         + " si sovrappone a un altro scaffale o alla sua area di manovra.");
                 }
@@ -116,7 +120,6 @@ public class MappaService {
             // 3. APPLICAZIONE MODIFICHE
             // ---------------------------------------------------------
             
-            // Se siamo arrivati qui, la validazione è passata. Aggiorno l'Entity.
             mappaEsistente.setReparto(reparto);
             mappaEsistente.setScaffale(scaffaleNuovo);
             mappaEsistente.setX(dto.getCoordinataX());
@@ -127,7 +130,6 @@ public class MappaService {
             
         }).collect(Collectors.toList());
 
-        // 4. Salvataggio massivo (JPA eseguirà le query di UPDATE)
         mappaRepository.saveAll(entitiesDaAggiornare);
     }
 }
