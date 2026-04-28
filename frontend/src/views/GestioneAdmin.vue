@@ -36,7 +36,8 @@ const form = ref({
 const caricaDipendenti = async () => {
   try {
     const response = await api.get('/api/auth/utenti')
-    utenti.value = response.data.filter(utente => utente.ruolo && utente.ruolo.nomeRuolo === 'Admin')
+    // RISOLTO: utente.ruolo è già la stringa 'Admin' grazie al DTO in Java!
+    utenti.value = response.data.filter(utente => utente.ruolo === 'Admin')
   } catch (error) {
     console.error("Errore di caricamento:", error)
   }
@@ -77,7 +78,8 @@ const apriModaleModifica = (dipendente) => {
     email: dipendente.email,
     password: '',
     confermaPassword: '',
-    ruolo: dipendente.ruolo ? dipendente.ruolo.nomeRuolo : 'Admin'
+    // RISOLTO: usa direttamente dipendente.ruolo
+    ruolo: dipendente.ruolo || 'Admin'
   }
   mostraModale.value = true
 }
@@ -219,7 +221,7 @@ const eliminaDipendente = async (id) => {
                 <td style="color:#64748b">{{ dipendente.email }}</td>
                 <td>
                   <span class="glass-badge badge-admin">
-                    {{ dipendente.ruolo ? dipendente.ruolo.nomeRuolo : 'Nessuno' }}
+                    {{ dipendente.ruolo ? dipendente.ruolo : 'Nessuno' }}
                   </span>
                 </td>
                 <td class="actions-col">
@@ -357,7 +359,7 @@ const eliminaDipendente = async (id) => {
 
 .main-content { flex-grow: 1; display: flex; flex-direction: column; overflow-y: auto; z-index: 10; }
 
-/* ------- TOPBAR CHIARA (Uguale a GestioneTask) ------- */
+/* ------- TOPBAR CHIARA ------- */
 .glass-topbar { background: rgba(255, 255, 255, 0.4); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); padding: 20px 40px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.3); }
 .topbar-right { display: flex; align-items: center; gap: 24px; }
 .greeting { font-size: 14px; color: #64748b; font-weight: 500; }
@@ -415,11 +417,11 @@ const eliminaDipendente = async (id) => {
 .form-group.half { width: 50%; }
 .form-group label { display: block; font-weight: 600; margin-bottom: 8px; color: #475569; font-size: 13px; }
 
+/* Modificatori Input per Sicurezza */
 .glass-input { width: 100%; padding: 12px 16px; border-radius: 12px; background: rgba(255, 255, 255, 0.6); border: 1px solid rgba(255,255,255,0.4); color: #0f172a; font-size: 13px; outline: none; box-sizing: border-box; transition: all 0.2s; }
 .glass-input::placeholder { color: #94a3b8; }
 .glass-input:focus { border-color: #6366f1; background: rgba(255, 255, 255, 0.9); box-shadow: 0 0 0 3px rgba(99,102,241,0.15); }
 
-/* Modificatori Input per Sicurezza */
 .glass-input-warning { width: 100%; padding: 12px 16px; border-radius: 12px; background: rgba(254, 243, 199, 0.5); border: 1px solid rgba(245, 158, 11, 0.5); color: #0f172a; font-size: 13px; outline: none; box-sizing: border-box; margin-bottom: 12px;}
 .glass-input-warning:focus { background: white; border-color: #f59e0b; box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15); }
 .glass-input-success { width: 100%; padding: 12px 16px; border-radius: 12px; background: rgba(209, 250, 229, 0.5); border: 1px solid rgba(16, 185, 129, 0.5); color: #0f172a; font-size: 13px; outline: none; box-sizing: border-box; }
@@ -455,6 +457,7 @@ const eliminaDipendente = async (id) => {
 .btn-ghost:hover { background: rgba(0,0,0,0.05); color: #0f172a;}
 .btn-success-glass { background: linear-gradient(135deg, #10b981, #059669); color: white; border: none; padding: 10px 24px; border-radius: 12px; cursor: pointer; font-weight: 600; font-size: 14px; transition: 0.3s; box-shadow: 0 4px 15px rgba(16,185,129,0.3);}
 .btn-success-glass:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(16,185,129,0.4); }
+.btn-success-glass:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none;}
 
 .role-badge { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 12px; font-weight: 600; font-size: 14px; }
 .role-badge svg { width: 20px; height: 20px; }
