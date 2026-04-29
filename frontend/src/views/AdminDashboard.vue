@@ -11,6 +11,11 @@ const nomeUtente = ref(sessionStorage.getItem('nomeUtente') || 'Amministratore')
 
 const tuttiTask = ref([])
 const dipendentiInTurnoCount = ref(0)
+const batchInbound = ref([])
+const staSimulando = ref(false)
+
+// --- RIPRISTINATO: V-MODEL PER LA QUANTITÀ ---
+const quantitaSimulazione = ref(1)
 
 // 1. ESTRAIAMO IL WEBSOCKET
 const { ultimoTaskRicevuto } = useWmsWebSocket()
@@ -47,7 +52,35 @@ watch(ultimoTaskRicevuto, (nuovoTask) => {
   }
 })
 
-// 4. COMPUTED PROPERTIES PER LE CARD E STATISTICHE
+// --- LOGICA SIMULAZIONE AGGIORNATA ---
+const simulaArrivi = async () => {
+  if (staSimulando.value) return;
+  if (quantitaSimulazione.value < 1 || quantitaSimulazione.value > 10) {
+    alert("Inserisci un valore tra 1 e 10 per simulare.");
+    return;
+  }
+
+  staSimulando.value = true;
+
+  try {
+    // MODIFICA CRITICA: Passiamo il parametro nell'URL (Query String) per rispettare @RequestParam
+    const response = await api.post(`/api/batch-prodotti/simulaArrivi?numeroBatch=${quantitaSimulazione.value}`);
+
+    batchInbound.value = [...response.data, ...batchInbound.value];
+
+  } catch (error) {
+    console.error("Errore durante la simulazione:", error);
+    alert("Errore di connessione al server durante la simulazione.");
+  } finally {
+    staSimulando.value = false;
+  }
+}
+
+const assegnaTaskInbound = (batch) => {
+  router.push({ path: '/GestioneTask', query: { fromInbound: batch.id } });
+}
+
+// 4. COMPUTED PROPERTIES
 const conteggioTaskAttivi = computed(() => {
   return tuttiTask.value.filter(t => t.statoTask !== 'COMPLETATO').length
 })
@@ -59,15 +92,11 @@ const efficienzaOdierna = computed(() => {
 })
 
 const ultimiCompletati = computed(() => {
-  return tuttiTask.value
-      .filter(t => t.statoTask === 'COMPLETATO')
-      .slice(0, 5)
+  return tuttiTask.value.filter(t => t.statoTask === 'COMPLETATO').slice(0, 5)
 })
 
 const attivitaInCorso = computed(() => {
-  return tuttiTask.value
-      .filter(t => t.statoTask === 'IN_CARICO')
-      .slice(0, 5)
+  return tuttiTask.value.filter(t => t.statoTask === 'IN_CARICO').slice(0, 5)
 })
 
 onMounted(() => {
@@ -93,8 +122,29 @@ const vaiAStorico = () => { router.push('/StoricoMovimenti') }
           <span class="greeting">Bentornato,</span>
           <h1>{{ nomeUtente }}</h1>
         </div>
-        <div class="user-profile">
-          <div class="avatar">{{ nomeUtente.charAt(0) }}</div>
+        <div class="topbar-right">
+
+          <!-- NUOVO BLOCCO SIMULAZIONE (Input + Bottone) -->
+          <div class="simulation-controls glass-badge">
+            <span class="sim-label">Lotti:</span>
+            <input
+                type="number"
+                v-model="quantitaSimulazione"
+                min="1"
+                max="10"
+                class="sim-input"
+                :disabled="staSimulando"
+            />
+            <button @click="simulaArrivi" class="btn-primary-glass" :disabled="staSimulando">
+              <svg v-if="!staSimulando" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+              <svg v-else class="spinner" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+              {{ staSimulando ? 'In arrivo...' : 'Simula Scarico' }}
+            </button>
+          </div>
+
+          <div class="user-profile">
+            <div class="avatar">{{ nomeUtente.charAt(0) }}</div>
+          </div>
         </div>
       </header>
 
@@ -134,38 +184,41 @@ const vaiAStorico = () => { router.push('/StoricoMovimenti') }
 
         <div class="dashboard-cards">
 
-          <div class="glass-card list-card">
-            <div class="card-header">
-              <h3>Ultimi Completati</h3>
-              <button @click="vaiAStorico" class="btn-glass-ghost">Storico</button>
+          <!-- CARD: AREA INBOUND -->
+          <div class="glass-card list-card inbound-area">
+            <div class="card-header inbound-header">
+              <h3>📦 Area INBOUND</h3>
+              <span class="glass-badge badge-warning">{{ batchInbound.length }} Da Smistare</span>
             </div>
 
-            <div v-if="ultimiCompletati.length > 0" class="inbound-list">
-              <div v-for="task in ultimiCompletati" :key="task.id" class="inbound-item glass-item">
+            <div v-if="batchInbound.length > 0" class="inbound-list scrollable-list">
+              <div v-for="batch in batchInbound" :key="batch.id" class="inbound-item glass-item">
                 <div class="inbound-info">
                   <div class="task-header">
-                    <span class="task-id">#TSK-{{ task.id }}</span>
-                    <span class="glass-badge badge-success">COMPLETATO</span>
+                    <span class="task-id">Lotto #{{ batch.id }}</span>
+                    <span class="glass-badge badge-neutral">{{ batch.quantita }} pz</span>
                   </div>
-                  <p class="item-desc">{{ task.descrizione }}</p>
-                  <span class="operator-name">Da: <strong>{{ task.nomeDipendente || 'Operatore' }}</strong></span>
+                  <p class="item-desc">{{ batch.nomeProdotto || 'Prodotto Sconosciuto' }}</p>
+                  <span class="operator-name">Scadenza: {{ batch.scadenza }}</span>
                 </div>
+                <button @click="assegnaTaskInbound(batch)" class="btn-smista">Smista</button>
               </div>
             </div>
 
             <div v-else class="empty-state-glass">
-              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
-              <p>Nessun task completato.</p>
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+              <p>L'area di carico è vuota.</p>
             </div>
           </div>
 
+          <!-- CARD: IN LAVORAZIONE -->
           <div class="glass-card list-card">
             <div class="card-header">
               <h3>In Lavorazione Ora</h3>
               <button @click="vaiAGestioneTask" class="btn-glass-ghost">Gestisci</button>
             </div>
 
-            <div v-if="attivitaInCorso.length > 0" class="inbound-list">
+            <div v-if="attivitaInCorso.length > 0" class="inbound-list scrollable-list">
               <div v-for="task in attivitaInCorso" :key="task.id" class="inbound-item glass-item">
                 <div class="inbound-info">
                   <div class="task-header">
@@ -189,6 +242,32 @@ const vaiAStorico = () => { router.push('/StoricoMovimenti') }
             </div>
           </div>
 
+          <!-- CARD: COMPLETATI -->
+          <div class="glass-card list-card">
+            <div class="card-header">
+              <h3>Ultimi Completati</h3>
+              <button @click="vaiAStorico" class="btn-glass-ghost">Storico</button>
+            </div>
+
+            <div v-if="ultimiCompletati.length > 0" class="inbound-list scrollable-list">
+              <div v-for="task in ultimiCompletati" :key="task.id" class="inbound-item glass-item">
+                <div class="inbound-info">
+                  <div class="task-header">
+                    <span class="task-id">#TSK-{{ task.id }}</span>
+                    <span class="glass-badge badge-success">COMPLETATO</span>
+                  </div>
+                  <p class="item-desc">{{ task.descrizione }}</p>
+                  <span class="operator-name">Da: <strong>{{ task.nomeDipendente || 'Operatore' }}</strong></span>
+                </div>
+              </div>
+            </div>
+
+            <div v-else class="empty-state-glass">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+              <p>Nessun task completato.</p>
+            </div>
+          </div>
+
         </div>
       </div>
     </main>
@@ -199,118 +278,49 @@ const vaiAStorico = () => { router.push('/StoricoMovimenti') }
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 /* ------- LAYOUT & BACKGROUND ANIMATO ------- */
-.glass-dashboard-layout {
-  display: flex;
-  height: 100vh;
-  width: 100vw;
-  /* Colore base neutro ma leggermente freddo */
-  background-color: #e2e8f0;
-  font-family: 'Inter', sans-serif;
-  margin: 0;
-  color: #1e293b;
-  position: relative;
-  overflow: hidden;
-}
+.glass-dashboard-layout { display: flex; height: 100vh; width: 100vw; background-color: #e2e8f0; font-family: 'Inter', sans-serif; margin: 0; color: #1e293b; position: relative; overflow: hidden; }
+.glass-bg-blob { position: absolute; border-radius: 50%; filter: blur(80px); z-index: 0; opacity: 0.6; }
+.blob-1 { top: -10%; left: -10%; width: 500px; height: 500px; background: #93c5fd; }
+.blob-2 { bottom: -20%; right: -10%; width: 600px; height: 600px; background: #c4b5fd; }
+.blob-3 { top: 40%; left: 40%; width: 400px; height: 400px; background: #86efac; opacity: 0.4; }
 
-/* Le macchie di colore che danno vita al vetro */
-.glass-bg-blob {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  z-index: 0;
-  opacity: 0.6;
-}
-
-.blob-1 {
-  top: -10%; left: -10%;
-  width: 500px; height: 500px;
-  background: #93c5fd; /* Azzurro */
-}
-
-.blob-2 {
-  bottom: -20%; right: -10%;
-  width: 600px; height: 600px;
-  background: #c4b5fd; /* Viola */
-}
-
-.blob-3 {
-  top: 40%; left: 40%;
-  width: 400px; height: 400px;
-  background: #86efac; /* Verde acqua */
-  opacity: 0.4;
-}
-
-/* Elementi in primo piano sopra lo sfondo */
-.main-content, .glass-sidebar {
-  position: relative;
-  z-index: 10;
-}
-
-/* ------- IL VETRO (MIXIN) ------- */
-.glass-card {
-  background: rgba(255, 255, 255, 0.65);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.1);
-  border-radius: 20px;
-}
+.main-content, .glass-sidebar { position: relative; z-index: 10; }
+.glass-card { background: rgba(255, 255, 255, 0.65); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.5); box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.1); border-radius: 20px; }
 
 /* ------- TOPBAR ------- */
-.main-content {
-  flex-grow: 1;
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-}
+.main-content { flex-grow: 1; display: flex; flex-direction: column; overflow-y: auto; }
+.glass-topbar { background: rgba(255, 255, 255, 0.4); backdrop-filter: blur(10px); padding: 20px 40px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.3); }
 
-.glass-topbar {
-  background: rgba(255, 255, 255, 0.4);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  padding: 20px 40px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
-}
-
+.topbar-right { display: flex; align-items: center; gap: 24px; }
 .greeting { font-size: 14px; color: #475569; font-weight: 500; }
 .topbar-left h1 { margin: 4px 0 0 0; font-size: 24px; font-weight: 700; color: #0f172a; letter-spacing: -0.5px; }
 
-.avatar {
-  width: 44px; height: 44px;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.8), rgba(168, 85, 247, 0.8));
-  backdrop-filter: blur(5px);
-  border: 1px solid rgba(255,255,255,0.5);
-  border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  color: white; font-weight: 600; font-size: 18px;
-  box-shadow: 0 4px 10px rgba(99, 102, 241, 0.3);
-}
+.avatar { width: 44px; height: 44px; background: linear-gradient(135deg, rgba(99, 102, 241, 0.8), rgba(168, 85, 247, 0.8)); border: 1px solid rgba(255,255,255,0.5); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 18px; box-shadow: 0 4px 10px rgba(99, 102, 241, 0.3); }
 
-.content-area { padding: 40px; max-width: 1200px; margin: 0 auto; width: 100%; box-sizing: border-box;}
+/* CONTROLLI SIMULAZIONE */
+.simulation-controls { display: flex; align-items: center; gap: 12px; padding: 4px 4px 4px 16px; border-radius: 14px; }
+.sim-label { font-size: 13px; font-weight: 600; color: #475569; }
+.sim-input { width: 48px; padding: 6px; border: 1px solid rgba(0,0,0,0.1); border-radius: 8px; font-family: 'Inter'; font-weight: 600; text-align: center; background: rgba(255,255,255,0.8); outline: none;}
+.sim-input:focus { border-color: #6366f1; }
+
+.btn-primary-glass { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; border: none; padding: 10px 16px; border-radius: 10px; cursor: pointer; font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 6px; transition: all 0.3s; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3); }
+.btn-primary-glass svg { width: 18px; height: 18px; }
+.btn-primary-glass:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4); }
+.btn-primary-glass:disabled { opacity: 0.7; cursor: not-allowed; }
+
+.spinner { animation: spin 1s linear infinite; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+.content-area { padding: 40px; max-width: 1400px; margin: 0 auto; width: 100%; box-sizing: border-box;}
 
 /* ------- STATISTICHE ------- */
 .stats-row { display: flex; gap: 24px; margin-bottom: 32px; }
-
-.stat-card {
-  flex: 1; padding: 24px;
-  display: flex; align-items: center; gap: 20px;
-  transition: transform 0.2s;
-}
+.stat-card { flex: 1; padding: 24px; display: flex; align-items: center; gap: 20px; transition: transform 0.2s; }
 .stat-card:hover { transform: translateY(-5px); }
 
-.stat-icon-wrapper {
-  width: 56px; height: 56px;
-  border-radius: 16px;
-  display: flex; align-items: center; justify-content: center;
-  background: rgba(255, 255, 255, 0.8);
-  border: 1px solid rgba(255,255,255,0.5);
-}
+.stat-icon-wrapper { width: 56px; height: 56px; border-radius: 16px; display: flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, 0.8); border: 1px solid rgba(255,255,255,0.5); }
 .stat-icon-wrapper svg { width: 28px; height: 28px; }
 
-/* Bagliori colorati per le icone */
 .blue-glow { color: #3b82f6; box-shadow: 0 0 20px rgba(59, 130, 246, 0.2); }
 .purple-glow { color: #a855f7; box-shadow: 0 0 20px rgba(168, 85, 247, 0.2); }
 .green-glow { color: #10b981; box-shadow: 0 0 20px rgba(16, 185, 129, 0.2); }
@@ -321,65 +331,45 @@ const vaiAStorico = () => { router.push('/StoricoMovimenti') }
 .stat-value { margin: 4px 0 0 0; font-size: 32px; font-weight: 800; color: #0f172a; }
 
 /* ------- CARD LISTE ------- */
-.dashboard-cards { display: flex; gap: 24px; }
-.list-card { flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 0;}
+.dashboard-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+.list-card { display: flex; flex-direction: column; overflow: hidden; padding: 0; max-height: 500px;}
 
-.card-header {
-  padding: 24px;
-  display: flex; justify-content: space-between; align-items: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
-  background: rgba(255, 255, 255, 0.4);
-}
-.card-header h3 { margin: 0; font-size: 18px; font-weight: 700; color: #0f172a; }
+.inbound-area { border: 2px solid rgba(245, 158, 11, 0.3); background: rgba(254, 243, 199, 0.3); }
+.inbound-header { background: rgba(245, 158, 11, 0.1) !important; border-bottom-color: rgba(245, 158, 11, 0.2) !important;}
 
-.btn-glass-ghost {
-  background: rgba(255, 255, 255, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  color: #475569; font-weight: 600; font-size: 13px;
-  cursor: pointer; padding: 6px 14px; border-radius: 8px;
-  transition: all 0.2s;
-}
+.card-header { padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.3); background: rgba(255, 255, 255, 0.4); }
+.card-header h3 { margin: 0; font-size: 17px; font-weight: 700; color: #0f172a; }
+
+.btn-glass-ghost { background: rgba(255, 255, 255, 0.5); border: 1px solid rgba(255, 255, 255, 0.6); color: #475569; font-weight: 600; font-size: 12px; cursor: pointer; padding: 6px 14px; border-radius: 8px; transition: all 0.2s; }
 .btn-glass-ghost:hover { background: rgba(255, 255, 255, 0.8); color: #0f172a; transform: translateY(-1px);}
 
+.scrollable-list { overflow-y: auto; flex-grow: 1; }
 .inbound-list { display: flex; flex-direction: column; }
-.glass-item {
-  padding: 20px 24px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
-  display: flex; justify-content: space-between; align-items: center;
-  transition: background 0.2s;
-}
-.glass-item:hover { background: rgba(255, 255, 255, 0.3); }
+
+.glass-item { padding: 16px 24px; border-bottom: 1px solid rgba(255, 255, 255, 0.3); display: flex; justify-content: space-between; align-items: center; transition: background 0.2s; }
+.glass-item:hover { background: rgba(255, 255, 255, 0.4); }
 .glass-item:last-child { border-bottom: none; }
 
 .inbound-info { display: flex; flex-direction: column; gap: 6px; }
 .task-header { display: flex; align-items: center; gap: 10px; }
-.task-id { font-size: 13px; font-weight: 700; color: #64748b; font-family: monospace; }
-.item-desc { margin: 0; font-size: 15px; font-weight: 600; color: #1e293b; }
+.task-id { font-size: 12px; font-weight: 700; color: #64748b; font-family: monospace; }
+.item-desc { margin: 0; font-size: 14px; font-weight: 600; color: #1e293b; }
 .operator-name { font-size: 12px; color: #64748b; }
 
-.glass-badge {
-  font-size: 10px; font-weight: 800; padding: 4px 8px; border-radius: 6px;
-  backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.4);
-}
+.glass-badge { font-size: 10px; font-weight: 800; padding: 4px 8px; border-radius: 6px; backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.4); }
 .badge-success { background: rgba(16, 185, 129, 0.2); color: #065f46; }
 .badge-active { background: rgba(59, 130, 246, 0.2); color: #1e40af; }
+.badge-warning { background: rgba(245, 158, 11, 0.2); color: #b45309; }
+.badge-neutral { background: rgba(255, 255, 255, 0.8); color: #475569; }
 
-.operator-chip {
-  display: flex; align-items: center; gap: 8px;
-  background: rgba(255, 255, 255, 0.5); padding: 4px 12px 4px 4px;
-  border-radius: 20px; border: 1px solid rgba(255,255,255,0.4);
-}
-.mini-avatar {
-  width: 24px; height: 24px; background: #cbd5e1; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 11px; font-weight: bold; color: #334155;
-}
-.operator-chip span { font-size: 13px; font-weight: 600; color: #334155; }
+.btn-smista { background: #f59e0b; color: white; border: none; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+.btn-smista:hover { background: #d97706; transform: scale(1.05); }
 
-.empty-state-glass {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  padding: 60px 0; color: #64748b;
-}
+.operator-chip { display: flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, 0.5); padding: 4px 12px 4px 4px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.4); }
+.mini-avatar { width: 24px; height: 24px; background: #cbd5e1; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; color: #334155; }
+.operator-chip span { font-size: 12px; font-weight: 600; color: #334155; }
+
+.empty-state-glass { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 0; color: #64748b; }
 .empty-state-glass svg { width: 48px; height: 48px; margin-bottom: 16px; opacity: 0.4; }
-.empty-state-glass p { margin: 0; font-size: 15px; font-weight: 500; }
+.empty-state-glass p { margin: 0; font-size: 14px; font-weight: 500; }
 </style>

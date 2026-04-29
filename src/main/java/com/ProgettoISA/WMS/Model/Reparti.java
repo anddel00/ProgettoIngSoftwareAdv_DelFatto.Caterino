@@ -20,16 +20,16 @@ public class Reparti {
     private Long id;
 
     @Column(name = "\"MaxX\"")
-    private Long MaxX;
+    private Long maxX;
 
     @Column(name = "\"MaxY\"")
-    private Long MaxY;
+    private Long maxY;
 
     @Column(name = "\"Temperatura\"")
-    private Long Temperatura;
+    private Long temperatura;
     
     @Column(name = "\"Nome\"")
-    private String Nome;
+    private String nome;
 
     @OneToMany(mappedBy = "reparto")
     private List<Mappa> mappe = new ArrayList<>();
@@ -38,10 +38,10 @@ public class Reparti {
     }
 
     public Reparti(Long MaxX, Long MaxY, Long Temperatura, String Nome) {
-        this.MaxX = MaxX;
-        this.MaxY = MaxY;
-        this.Temperatura = Temperatura;
-        this.Nome = Nome;
+        this.maxX = MaxX;
+        this.maxY = MaxY;
+        this.temperatura = Temperatura;
+        this.nome = Nome;
     }
 
     public Long getId() {
@@ -53,27 +53,27 @@ public class Reparti {
     }
 
     public Long getMaxX() {
-        return MaxX;
+        return maxX;
     }
 
     public void setMaxX(Long maxX) {
-        MaxX = maxX;
+        maxX = maxX;
     }
 
     public Long getMaxY() {
-        return MaxY;
+        return maxY;
     }
 
     public void setMaxY(Long maxY) {
-        MaxY = maxY;
+        this.maxY = maxY;
     }
 
     public Long getTemperatura() {
-        return Temperatura;
+        return temperatura;
     }
 
     public void setTemperatura(Long temperatura) {
-        Temperatura = temperatura;
+        this.temperatura = temperatura;
     }
 
     public List<Mappa> getMappe() {
@@ -81,11 +81,11 @@ public class Reparti {
     }
 
     public void setNome(String nome) {
-        Nome = nome;
+        this.nome = nome;
     }
 
     public String getNome() {
-        return Nome;
+        return nome;
     }
 }
 

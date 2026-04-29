@@ -47,10 +47,7 @@ public class Scaffali {
     }
 
     public Scaffali(int max_righe, int max_colonne, int max_altezza, int max_peso) {
-        this.max_righe = max_righe;
-        this.max_colonne = max_colonne;
-        this.max_altezza = max_altezza;
-        this.max_peso = max_peso;
+
     }
 
     public Long getId() {
@@ -109,4 +106,5 @@ public class Scaffali {
         return mappa_scaffali;
     }
 
-}
+    }
+
