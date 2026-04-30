@@ -18,7 +18,7 @@ public class BatchScaffale {
     private Integer id;
 
     @ManyToOne
-    @JoinColumn(name = "\"Id_Scaffale\"", nullable = false)
+    @JoinColumn(name = "\"Id_Mappa\"", nullable = false)
     private Scaffali scaffale;
 
     @ManyToOne
