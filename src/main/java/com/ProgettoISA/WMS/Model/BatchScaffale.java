@@ -19,7 +19,7 @@ public class BatchScaffale {
 
     @ManyToOne
     @JoinColumn(name = "\"Id_Mappa\"", nullable = false)
-    private Scaffali scaffale;
+    private Mappa mappa;
 
     @ManyToOne
     @JoinColumn(name = "\"Id_Batch\"", nullable = false)
@@ -40,8 +40,8 @@ public class BatchScaffale {
     public BatchScaffale() {
     }
 
-    public BatchScaffale(Scaffali scaffale, BatchProdotti batch_prodotti, Integer colonna, Integer riga, Integer altezza, Integer qta) {
-        this.scaffale = scaffale;
+    public BatchScaffale(Mappa mappa, BatchProdotti batch_prodotti, Integer colonna, Integer riga, Integer altezza, Integer qta) {
+        this.mappa = mappa;
         this.batch_prodotti = batch_prodotti;
         this.colonna = colonna;
         this.riga = riga;
@@ -57,12 +57,12 @@ public class BatchScaffale {
         this.id = id;
     }
 
-    public Scaffali getScaffale() {
-        return scaffale;
+    public Mappa getMappa() {
+        return mappa;
     }
 
-    public void setScaffale(Scaffali scaffale) {
-        this.scaffale = scaffale;
+    public void setMappa(Mappa mappa) {
+        this.mappa = mappa;
     }
 
     public BatchProdotti getBatch_prodotti() {
