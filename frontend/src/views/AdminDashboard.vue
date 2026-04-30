@@ -11,6 +11,10 @@ const nomeUtente = ref(sessionStorage.getItem('nomeUtente') || 'Amministratore')
 
 const tuttiTask = ref([])
 const dipendentiInTurnoCount = ref(0)
+const isSimulando = ref(false)
+
+// NUOVA VARIABILE: Controlla quanti lotti generare (default 5)
+const numeroDaSimulare = ref(5)
 
 // 1. ESTRAIAMO IL WEBSOCKET
 const { ultimoTaskRicevuto } = useWmsWebSocket()
@@ -46,6 +50,28 @@ watch(ultimoTaskRicevuto, (nuovoTask) => {
     }
   }
 })
+
+// FUNZIONE AGGIORNATA: Usa il valore dell'input numerico
+const simulaNuoviArrivi = async () => {
+  if (numeroDaSimulare.value < 1) {
+    alert("Inserisci un numero valido maggiore di 0")
+    return
+  }
+  
+  isSimulando.value = true
+  try {
+    // Invia il valore dinamico al backend
+    await api.post('/api/batch-prodotti/simulaArrivi', numeroDaSimulare.value, {
+      headers: { 'Content-Type': 'application/json' }
+    })
+    alert(`📦 Simulazione completata! ${numeroDaSimulare.value} nuovi lotti generati.`)
+  } catch (error) {
+    console.error("Errore nella simulazione:", error)
+    alert("❌ Errore durante la simulazione degli arrivi.")
+  } finally {
+    isSimulando.value = false
+  }
+}
 
 // 4. COMPUTED PROPERTIES PER LE CARD E STATISTICHE
 const conteggioTaskAttivi = computed(() => {
@@ -93,7 +119,27 @@ const vaiAStorico = () => { router.push('/StoricoMovimenti') }
           <span class="greeting">Bentornato,</span>
           <h1>{{ nomeUtente }}</h1>
         </div>
-        <div class="user-profile">
+        
+        <div class="user-profile" style="display: flex; gap: 20px; align-items: center;">
+          
+          <div class="simulation-controls">
+            <input 
+              type="number" 
+              v-model.number="numeroDaSimulare" 
+              min="1"
+              max="100"
+              class="glass-input-number"
+              title="Numero lotti da generare"
+            />
+            <button 
+              @click="simulaNuoviArrivi" 
+              class="btn-glass-primary" 
+              :disabled="isSimulando"
+            >
+              {{ isSimulando ? 'Generazione...' : '+ Simula Arrivi' }}
+            </button>
+          </div>
+
           <div class="avatar">{{ nomeUtente.charAt(0) }}</div>
         </div>
       </header>
@@ -203,7 +249,6 @@ const vaiAStorico = () => { router.push('/StoricoMovimenti') }
   display: flex;
   height: 100vh;
   width: 100vw;
-  /* Colore base neutro ma leggermente freddo */
   background-color: #e2e8f0;
   font-family: 'Inter', sans-serif;
   margin: 0;
@@ -212,7 +257,6 @@ const vaiAStorico = () => { router.push('/StoricoMovimenti') }
   overflow: hidden;
 }
 
-/* Le macchie di colore che danno vita al vetro */
 .glass-bg-blob {
   position: absolute;
   border-radius: 50%;
@@ -224,23 +268,22 @@ const vaiAStorico = () => { router.push('/StoricoMovimenti') }
 .blob-1 {
   top: -10%; left: -10%;
   width: 500px; height: 500px;
-  background: #93c5fd; /* Azzurro */
+  background: #93c5fd; 
 }
 
 .blob-2 {
   bottom: -20%; right: -10%;
   width: 600px; height: 600px;
-  background: #c4b5fd; /* Viola */
+  background: #c4b5fd; 
 }
 
 .blob-3 {
   top: 40%; left: 40%;
   width: 400px; height: 400px;
-  background: #86efac; /* Verde acqua */
+  background: #86efac; 
   opacity: 0.4;
 }
 
-/* Elementi in primo piano sopra lo sfondo */
 .main-content, .glass-sidebar {
   position: relative;
   z-index: 10;
@@ -289,6 +332,65 @@ const vaiAStorico = () => { router.push('/StoricoMovimenti') }
   box-shadow: 0 4px 10px rgba(99, 102, 241, 0.3);
 }
 
+/* ------- CONTROLLI SIMULAZIONE (NUOVI) ------- */
+.simulation-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.3);
+  padding: 6px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.glass-input-number {
+  width: 50px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  color: #0f172a;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 8px 6px;
+  border-radius: 10px;
+  outline: none;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.glass-input-number:focus {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(99, 102, 241, 0.6);
+  box-shadow: 0 0 10px rgba(99, 102, 241, 0.2);
+}
+
+.btn-glass-primary {
+  background: rgba(99, 102, 241, 0.8);
+  backdrop-filter: blur(5px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: white;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 8px 16px;
+  border-radius: 10px;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 10px rgba(99, 102, 241, 0.2);
+}
+
+.btn-glass-primary:hover:not(:disabled) {
+  background: rgba(99, 102, 241, 1);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(99, 102, 241, 0.4);
+}
+
+.btn-glass-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .content-area { padding: 40px; max-width: 1200px; margin: 0 auto; width: 100%; box-sizing: border-box;}
 
 /* ------- STATISTICHE ------- */
@@ -310,7 +412,6 @@ const vaiAStorico = () => { router.push('/StoricoMovimenti') }
 }
 .stat-icon-wrapper svg { width: 28px; height: 28px; }
 
-/* Bagliori colorati per le icone */
 .blue-glow { color: #3b82f6; box-shadow: 0 0 20px rgba(59, 130, 246, 0.2); }
 .purple-glow { color: #a855f7; box-shadow: 0 0 20px rgba(168, 85, 247, 0.2); }
 .green-glow { color: #10b981; box-shadow: 0 0 20px rgba(16, 185, 129, 0.2); }
