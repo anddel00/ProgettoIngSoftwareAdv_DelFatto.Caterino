@@ -38,9 +38,6 @@ public class Scaffali {
     private List<Task> task_scaffali_fine = new ArrayList<>();
 
     @OneToMany(mappedBy = "scaffale")
-    private List<BatchScaffale> batch_scaffali = new ArrayList<>();
-
-    @OneToMany(mappedBy = "scaffale")
     private List<Mappa> mappa_scaffali = new ArrayList<>();
 
     public Scaffali() {
@@ -101,9 +98,6 @@ public class Scaffali {
         return task_scaffali_fine;
     }
 
-    public List<BatchScaffale> getBatch_scaffali() {
-        return batch_scaffali;
-    }
 
     public List<Mappa> getMappa_scaffali() {
         return mappa_scaffali;
