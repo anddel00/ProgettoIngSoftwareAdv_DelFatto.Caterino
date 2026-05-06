@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -36,6 +37,16 @@ public ResponseEntity<List<BatchProdottiDTO>> simulaArrivi(@RequestBody int nume
         System.err.println("❌ ERRORE DURANTE LA SIMULAZIONE:");
         e.printStackTrace(); 
         
+        return ResponseEntity.internalServerError().build();
+    }
+}
+
+@GetMapping("/carica")
+public ResponseEntity<List<BatchProdottiDTO>> caricaBatchProdotti() {
+    try {
+        List<BatchProdottiDTO> batchList = batchProdottiService.getTuttiIBatchProdotti();
+        return ResponseEntity.ok(batchList);
+    } catch (Exception e) {
         return ResponseEntity.internalServerError().build();
     }
 }

@@ -5,6 +5,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
@@ -70,5 +71,16 @@ public class BatchProdottiService {
         
         // 4. Restituiamo i DTO
         return batchListDTO;
+    }
+
+    public List<BatchProdottiDTO> getTuttiIBatchProdotti() {
+        List<BatchProdotti> batchProdotti = batchProdottiRepository.findAll();  
+        
+        return batchProdotti.stream().map(bp -> new BatchProdottiDTO(
+            bp.getId(),
+            bp.getProdotto().getId(),
+            bp.getQta(),
+            bp.getScadenza().toString()
+        )).collect(Collectors.toList());    
     }
 }
