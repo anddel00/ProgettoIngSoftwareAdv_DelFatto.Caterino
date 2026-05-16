@@ -37,7 +37,7 @@ public class BatchScaffaleController {
     @PostMapping("/salva")
     public ResponseEntity<Void> salvaBatchScaffali(@RequestBody List<BatchScaffaleDTO> batchDTOs) {
         try {
-            batchScaffaleService.salvaTuttiIBatch(batchDTOs);
+            batchScaffaleService.sincronizzaBatch(batchDTOs);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();

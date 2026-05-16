@@ -1,17 +1,19 @@
 package com.ProgettoISA.WMS.Service;
 
-import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.ProgettoISA.WMS.DTO.BatchScaffaleDTO;
+import com.ProgettoISA.WMS.Model.BatchProdotti;
 import com.ProgettoISA.WMS.Model.BatchScaffale;
 import com.ProgettoISA.WMS.Repository.BatchProdottiRepository;
 import com.ProgettoISA.WMS.Repository.BatchScaffaleRepository;
 import com.ProgettoISA.WMS.Repository.MappaRepository;
-
 
 @Service
 public class BatchScaffaleService {
@@ -27,7 +29,6 @@ public class BatchScaffaleService {
 
     public List<BatchScaffaleDTO> getTuttiIBatchScaffali() {
         List<BatchScaffale> batchScaffali = batchScaffaleRepository.findAll();
-        
         return batchScaffali.stream().map(bs -> new BatchScaffaleDTO(
             bs.getId().longValue(),
             bs.getMappa().getId(), 
@@ -39,20 +40,71 @@ public class BatchScaffaleService {
         )).collect(Collectors.toList());
     }
 
-    public void salvaTuttiIBatch(List<BatchScaffaleDTO> batchDTOs) {
-        List<BatchScaffale> batchDaSalvare = new ArrayList<>();
-        for(int i=0; i<batchDTOs.size(); i++) {
-            BatchScaffale batch = new BatchScaffale(
-                mappaRepository.findById(batchDTOs.get(i).getIdMappa()).orElse(null),
-                batchProdottiRepository.findById(batchDTOs.get(i).getIdBatchProdotti()).orElse(null),
-                batchDTOs.get(i).getColonna(),
-                batchDTOs.get(i).getRiga(),
-                batchDTOs.get(i).getAltezza(),
-                batchDTOs.get(i).getQta()
-            );
-            batchDaSalvare.add(batch);
+    @Transactional(rollbackFor = Exception.class)
+    public void sincronizzaBatch(List<BatchScaffaleDTO> payload) throws Exception {
+        Set<Long> lottiCoinvolti = new HashSet<>();
+
+        // Cicliamo l'unica lista inviata dal frontend
+        for (BatchScaffaleDTO dto : payload) {
+            
+            if (dto.getId() == null) {
+                // ==========================================
+                // CASO A: INSERIMENTO (Non ha un ID assegnato)
+                // ==========================================
+                BatchScaffale esistente = batchScaffaleRepository.trovaEsistente(
+                    dto.getIdMappa(), dto.getIdBatchProdotti(), dto.getRiga(), dto.getColonna(), dto.getAltezza()
+                ).orElse(null);
+
+                if (esistente != null) {
+                    esistente.setQta(esistente.getQta() + dto.getQta());
+                    batchScaffaleRepository.save(esistente);
+                } else {
+                    BatchScaffale nuovo = new BatchScaffale(
+                        mappaRepository.findById(dto.getIdMappa()).orElseThrow(() -> new Exception("Mappa non trovata")),
+                        batchProdottiRepository.findById(dto.getIdBatchProdotti()).orElseThrow(() -> new Exception("Batch non trovato")),
+                        dto.getColonna(),
+                        dto.getRiga(),
+                        dto.getAltezza(),
+                        dto.getQta()
+                    );
+                    batchScaffaleRepository.save(nuovo);
+                }
+                lottiCoinvolti.add(dto.getIdBatchProdotti());
+
+            } else {
+                // ==========================================
+                // CASO B: AGGIORNAMENTO O RIMOZIONE (L'ID c'è)
+                // ==========================================
+                BatchScaffale esistente = batchScaffaleRepository.findById(dto.getId())
+                    .orElseThrow(() -> new Exception("Record non trovato"));
+
+                if (dto.getQta() <= 0) {
+                    batchScaffaleRepository.delete(esistente);
+                } else {
+                    esistente.setQta(dto.getQta());
+                    batchScaffaleRepository.save(esistente);
+                }
+                lottiCoinvolti.add(esistente.getBatch_prodotti().getId());
+            }
         }
-        batchScaffaleRepository.saveAll(batchDaSalvare);
+
+        // Forziamo il DB ad aggiornare i dati per fare le somme matematiche correttamente
+        batchScaffaleRepository.flush();
+
+        // ==========================================
+        // 3. CONTROLLO TETTO MASSIMO DI SICUREZZA
+        // ==========================================
+        for (Long idBatch : lottiCoinvolti) {
+            BatchProdotti lottoMaster = batchProdottiRepository.findById(idBatch)
+                .orElseThrow(() -> new Exception("Lotto originale non trovato"));
+            
+            Integer qtaSuScaffali = batchScaffaleRepository.sumQtaByIdBatch(idBatch);
+            if (qtaSuScaffali == null) qtaSuScaffali = 0;
+
+            if (qtaSuScaffali > lottoMaster.getQta()) {
+                throw new Exception("Errore: Quantità massima superata per il lotto " + idBatch + 
+                                    ". Spazio max: " + lottoMaster.getQta() + " Pz.");
+            }
+        }
     }
-    
 }

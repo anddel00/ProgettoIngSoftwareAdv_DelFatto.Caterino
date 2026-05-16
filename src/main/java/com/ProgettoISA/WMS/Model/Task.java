@@ -41,10 +41,14 @@ public class Task {
     private int vecchia_x;
     @Column(name = "\"VecchiaY\"")
     private int vecchia_y;
+    @Column(name = "\"VecchiaZ\"")
+    private int vecchia_z;
     @Column(name = "\"NuovaX\"")
     private int nuova_x;
     @Column(name = "\"NuovaY\"")
     private int nuova_y;
+    @Column(name = "\"NuovaZ\"")
+    private int nuova_z;
     @Column(name = "\"StatoTask\"")
     private String stato_task;
     @Column(name = "\"QtaSpostata\"")
@@ -56,7 +60,7 @@ public class Task {
     public Task() {
     }
 
-    public Task(String descrizione, String tipo_task, BatchProdotti batch_prodotti, Scaffali scaffale_inizio, Scaffali scaffale_fine, int vecchia_x, int vecchia_y, int nuova_x, int nuova_y, String stato_task, int qta_spostata) {
+    public Task(String descrizione, String tipo_task, BatchProdotti batch_prodotti, Scaffali scaffale_inizio, Scaffali scaffale_fine, int vecchia_x, int vecchia_y, int vecchia_z, int nuova_x, int nuova_y, int nuova_z, String stato_task, int qta_spostata) {
         this.descrizione = descrizione;
         this.tipo_task = tipo_task;
         this.batch_prodotti = batch_prodotti;
@@ -64,8 +68,10 @@ public class Task {
         this.scaffale_fine = scaffale_fine;
         this.vecchia_x = vecchia_x;
         this.vecchia_y = vecchia_y;
+        this.vecchia_z = vecchia_z;
         this.nuova_x = nuova_x;
         this.nuova_y = nuova_y;
+        this.nuova_z = nuova_z;
         this.stato_task = stato_task;
         this.qta_spostata = qta_spostata;
     }
@@ -148,6 +154,21 @@ public class Task {
 
     public void setNuova_y(int nuova_y) {
         this.nuova_y = nuova_y;
+    }
+
+    public int getVecchia_z() {
+        return vecchia_z;
+    }
+    public void setVecchia_z(int vecchia_z) {
+        this.vecchia_z = vecchia_z;
+    }
+
+    public int getNuova_z() {
+        return nuova_z;
+    }
+
+    public void setNuova_z(int nuova_z) {
+        this.nuova_z = nuova_z;
     }
 
     public String getStato_task() {

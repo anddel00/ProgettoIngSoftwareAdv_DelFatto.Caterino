@@ -17,7 +17,6 @@ const tuttiIBatch = ref([]);
 const lottiSospesi = ref([]);
 const batchScaffaliDati = ref([]);
 
-// "Carrelli" delle operazioni pendenti
 const nuoviAssegnamenti = ref([]); 
 const modifichePendenti = ref([]); 
 
@@ -43,11 +42,10 @@ const isSavingAssignments = ref(false);
 const scaffaleSelezionato = ref(null);
 let mappaOriginale = [];
 
-// --- GESTIONE PIANI (ORA BASE 0) ---
+// --- GESTIONE PIANI (BASE 0 IN MEMORIA, BASE 1 IN UI) ---
 const pianiMappa = ref({}); 
 
 const getPiano = (idMappa) => {
-  // Ritorna 0 come piano di default per allinearsi al DB
   return pianiMappa.value[idMappa] !== undefined ? pianiMappa.value[idMappa] : 0;
 };
 
@@ -55,7 +53,6 @@ const cambiaPiano = (idMappa, idScaffaleTemplate, delta) => {
   const info = getDatiTecniciScaffale(idScaffaleTemplate);
   const max = info ? info.max_altezza : 1;
   const current = getPiano(idMappa);
-  // Logica 0-indexed: il piano max è max_altezza - 1
   if (current + delta >= 0 && current + delta < max) {
     pianiMappa.value[idMappa] = current + delta;
   }
@@ -85,7 +82,6 @@ const getNomeProdotto = (idProdotto) => {
 
 const MAX_SPAZIO_CELLA = 100;
 
-// FORZATO IL NUMBER() SU TUTTI I CAMPI
 const calcolaSpazioOccupatoCella = (idMappa, altezza, riga, colonna) => {
   let spazio = 0;
   const merce = [...batchScaffaliDati.value, ...nuoviAssegnamenti.value].filter(
@@ -113,6 +109,10 @@ const calcolaPesoOccupatoScaffale = (idMappa) => {
 
 // --- LOGICA DEL MODALE E RIMOZIONE ---
 const cellaDettaglioAttiva = ref(null);
+
+const chiudiDettaglioCella = () => { 
+  cellaDettaglioAttiva.value = null; 
+};
 
 const apriModaleDettaglio = (cella, rigaLocale, colonnaLocale, pianoAttuale) => {
   const merceCellaVecchia = batchScaffaliDati.value.filter(bs => 
@@ -147,15 +147,11 @@ const rimuoviDaCella = (elementoModale) => {
 
   let lottoInSidebar = lottiSospesi.value.find(l => Number(l.id) === Number(elementoModale.idBatchProdotti));
   if (!lottoInSidebar) {
-    const lottoOrig = tuttiIBatch.value.find(b => Number(b.id) === Number(elementoModale.idBatchProdotti));
-    lottoInSidebar = JSON.parse(JSON.stringify(lottoOrig));
-    lottoInSidebar.quantita = 0;
-    lottiSospesi.value.push(lottoInSidebar);
+    lottoInSidebar = tuttiIBatch.value.find(b => Number(b.id) === Number(elementoModale.idBatchProdotti));
+    if (lottoInSidebar) lottiSospesi.value.unshift(lottoInSidebar); // RIMETTE IN CIMA
   }
-  lottoInSidebar.quantita += qtaTogliere;
 
-  const lottoInTutti = tuttiIBatch.value.find(b => Number(b.id) === Number(elementoModale.idBatchProdotti));
-  if (lottoInTutti) lottoInTutti.quantita += qtaTogliere;
+  if (lottoInSidebar) lottoInSidebar.quantita += qtaTogliere;
 
   elementoModale.refOriginale.qta -= qtaTogliere;
   elementoModale.qta -= qtaTogliere; 
@@ -163,22 +159,24 @@ const rimuoviDaCella = (elementoModale) => {
   if (elementoModale.isNuovo) {
     if (elementoModale.refOriginale.qta <= 0) nuoviAssegnamenti.value = nuoviAssegnamenti.value.filter(na => na !== elementoModale.refOriginale);
   } else {
+    // Gestione Tracciamento Modifica (Copia anche l'id per il backend)
     let tracciaModifica = modifichePendenti.value.find(m => Number(m.id) === Number(elementoModale.refOriginale.id));
     if (!tracciaModifica) {
       tracciaModifica = { ...elementoModale.refOriginale };
       modifichePendenti.value.push(tracciaModifica);
     }
     tracciaModifica.qta = elementoModale.refOriginale.qta;
-
+    
+    // Aggiornamento puramente visivo della griglia
     if (elementoModale.refOriginale.qta <= 0) {
       batchScaffaliDati.value = batchScaffaliDati.value.filter(bs => Number(bs.id) !== Number(elementoModale.refOriginale.id));
     }
   }
 
+  // Pulizia visiva modale
   if (elementoModale.qta <= 0) cellaDettaglioAttiva.value.elementi = cellaDettaglioAttiva.value.elementi.filter(e => e !== elementoModale);
   cellaDettaglioAttiva.value.spazioOccupato = calcolaSpazioOccupatoCella(cellaDettaglioAttiva.value.idMappa, cellaDettaglioAttiva.value.piano, cellaDettaglioAttiva.value.riga, cellaDettaglioAttiva.value.colonna);
   if (cellaDettaglioAttiva.value.elementi.length === 0) chiudiDettaglioCella();
-  if(lottoDaAssegnare.value && Number(lottoDaAssegnare.value.id) === Number(elementoModale.idBatchProdotti)) quantitaSelezionata.value = lottoInSidebar.quantita;
 };
 
 // --- GESTISCI CLICK SULLO SLOT ---
@@ -188,8 +186,6 @@ const gestisciClickCella = (cella, slotIndex) => {
   const pianoAttuale = getPiano(cella.id);
   const info = getDatiTecniciScaffale(cella.idScaffale);
   const isOrizzontale = cella.orientamentoScaffale === 'ORIZZONTALE';
-  
-  // ORA LA MATEMATICA E' A BASE 0: Niente più +1
   const rigaLocale = Math.floor((slotIndex - 1) / (isOrizzontale ? info.max_righe : info.max_colonne));
   const colonnaLocale = ((slotIndex - 1) % (isOrizzontale ? info.max_righe : info.max_colonne));
 
@@ -212,27 +208,26 @@ const gestisciClickCella = (cella, slotIndex) => {
       alert(`Scaffale sovraccarico! Libero: ${(info.max_peso || 9999) - pesoAttuale} kg.`); return;
     }
 
+    lottoDaAssegnare.value.quantita -= quantitaSelezionata.value;
+
     const payload = {
-      idMappa: cella.id, idBatchProdotti: lottoDaAssegnare.value.id,
-      colonna: colonnaLocale, riga: rigaLocale, altezza: pianoAttuale, qta: quantitaSelezionata.value
+      // Niente ID qui: il backend capirà che è un inserimento
+      idMappa: cella.id, 
+      idBatchProdotti: lottoDaAssegnare.value.id,
+      colonna: colonnaLocale, 
+      riga: rigaLocale, 
+      altezza: pianoAttuale, 
+      qta: quantitaSelezionata.value
     };
 
-    const modEsistente = modifichePendenti.value.find(m => Number(m.idMappa) === Number(cella.id) && Number(m.altezza) === Number(pianoAttuale) && Number(m.riga) === Number(rigaLocale) && Number(m.colonna) === Number(colonnaLocale) && Number(m.idBatchProdotti) === Number(payload.idBatchProdotti));
-    const bsEsistente = batchScaffaliDati.value.find(bs => Number(bs.idMappa) === Number(cella.id) && Number(bs.altezza) === Number(pianoAttuale) && Number(bs.riga) === Number(rigaLocale) && Number(bs.colonna) === Number(colonnaLocale) && Number(bs.idBatchProdotti) === Number(payload.idBatchProdotti));
+    const indexEsistenteNuovo = nuoviAssegnamenti.value.findIndex(a => 
+      Number(a.idMappa) === Number(cella.id) && Number(a.altezza) === Number(pianoAttuale) && 
+      Number(a.riga) === Number(rigaLocale) && Number(a.colonna) === Number(colonnaLocale) && 
+      Number(a.idBatchProdotti) === Number(payload.idBatchProdotti)
+    );
     
-    if (bsEsistente) {
-      bsEsistente.qta += payload.qta;
-      if (!modEsistente) modifichePendenti.value.push({...bsEsistente});
-      else modEsistente.qta = bsEsistente.qta;
-    } else {
-      const indexEsistenteNuovo = nuoviAssegnamenti.value.findIndex(a => Number(a.idMappa) === Number(cella.id) && Number(a.altezza) === Number(pianoAttuale) && Number(a.riga) === Number(rigaLocale) && Number(a.colonna) === Number(colonnaLocale) && Number(a.idBatchProdotti) === Number(payload.idBatchProdotti));
-      if (indexEsistenteNuovo >= 0) nuoviAssegnamenti.value[indexEsistenteNuovo].qta += payload.qta;
-      else nuoviAssegnamenti.value.push(payload);
-    }
-
-    lottoDaAssegnare.value.quantita -= quantitaSelezionata.value;
-    const lottoMaster = tuttiIBatch.value.find(l => Number(l.id) === Number(lottoDaAssegnare.value.id));
-    if (lottoMaster) lottoMaster.quantita -= quantitaSelezionata.value;
+    if (indexEsistenteNuovo >= 0) nuoviAssegnamenti.value[indexEsistenteNuovo].qta += payload.qta;
+    else nuoviAssegnamenti.value.push(payload);
 
     if (lottoDaAssegnare.value.quantita <= 0) {
       lottiSospesi.value = lottiSospesi.value.filter(l => Number(l.id) !== Number(lottoDaAssegnare.value.id));
@@ -244,27 +239,39 @@ const gestisciClickCella = (cella, slotIndex) => {
   }
 };
 
-const chiudiDettaglioCella = () => { cellaDettaglioAttiva.value = null; };
-
+// --- SALVATAGGIO (UNIFICATO) ---
 const salvaAssegnamenti = async () => {
   if (nuoviAssegnamenti.value.length === 0 && modifichePendenti.value.length === 0) return;
   isSavingAssignments.value = true;
   try {
-    const payloadSync = { daInserire: nuoviAssegnamenti.value, daAggiornare: modifichePendenti.value };
-    console.log("Inviando al backend:", payloadSync);
-    alert(`(SIMULAZIONE) Dati pronti per il DB! Da Inserire: ${payloadSync.daInserire.length}, Da Aggiornare: ${payloadSync.daAggiornare.length}`);
+    // Uniamo le due liste in un solo array come avevamo detto
+    const payloadSingolo = [...nuoviAssegnamenti.value, ...modifichePendenti.value];
+    
+    // RIMESSO L'URL ORIGINALE CHE FUNZIONA NEL TUO BACKEND: /salva
+    await api.post('/api/batch-scaffale/salva', payloadSingolo);
+    
+    alert("Dati salvati e sincronizzati con successo!");
     window.location.reload(); 
-  } catch (error) { alert("Errore durante il salvataggio."); } finally { isSavingAssignments.value = false; }
+  } catch (error) { 
+    console.error("Errore salvataggio API:", error);
+    const errorMsg = error.response?.data?.message || error.response?.data || "Errore durante il salvataggio dei dati.";
+    alert(errorMsg);
+  } finally { 
+    isSavingAssignments.value = false; 
+  }
 };
 
 const annullaAssegnamenti = () => { window.location.reload(); };
 
 const selezionaLotto = (lotto) => {
-  if (lottoDaAssegnare.value && Number(lottoDaAssegnare.value.id) === Number(lotto.id)) lottoDaAssegnare.value = null; 
-  else { lottoDaAssegnare.value = lotto; quantitaSelezionata.value = lotto.quantita; }
+  if (lottoDaAssegnare.value && Number(lottoDaAssegnare.value.id) === Number(lotto.id)) {
+    lottoDaAssegnare.value = null; 
+  } else {
+    lottoDaAssegnare.value = lotto;
+    quantitaSelezionata.value = 1; 
+  }
 };
 
-// FORZATO IL NUMBER() E BASE 0
 const getSlotStatus = (cella, slotIndex) => {
   const pianoAttuale = getPiano(cella.id);
   const info = getDatiTecniciScaffale(cella.idScaffale);
@@ -276,7 +283,6 @@ const getSlotStatus = (cella, slotIndex) => {
     Number(bs.idMappa) === Number(cella.id) && Number(bs.altezza) === Number(pianoAttuale) && 
     Number(bs.riga) === Number(rigaLocale) && Number(bs.colonna) === Number(colonnaLocale) && Number(bs.qta) > 0
   );
-  
   const hasSalvati = batchScaffaliDati.value.some(bs => 
     Number(bs.idMappa) === Number(cella.id) && Number(bs.altezza) === Number(pianoAttuale) && 
     Number(bs.riga) === Number(rigaLocale) && Number(bs.colonna) === Number(colonnaLocale) && Number(bs.qta) > 0
@@ -287,7 +293,6 @@ const getSlotStatus = (cella, slotIndex) => {
   return 'vuoto';
 };
 
-// --- GESTIONE INFO SCAFFALE & MAPPA ---
 const scaffaleInfoAttivo = ref(null);
 const apriInfoScaffale = (cella) => { scaffaleInfoAttivo.value = cella; };
 const chiudiInfoScaffale = () => { scaffaleInfoAttivo.value = null; };
@@ -295,7 +300,6 @@ const chiudiInfoScaffale = () => { scaffaleInfoAttivo.value = null; };
 const hoverX = ref(null);
 const hoverY = ref(null);
 const isPosizioneValida = ref(false);
-
 const impostaHover = (x, y) => { if (!scaffaleSelezionato.value) return; hoverX.value = x; hoverY.value = y; isPosizioneValida.value = controllaValidita(x, y); };
 const azzeraHover = () => { hoverX.value = null; hoverY.value = null; };
 
@@ -350,7 +354,6 @@ const salvaMappa = async () => { isSaving.value = true; try { await api.post('/a
 onMounted(async () => {
   const ruolo = sessionStorage.getItem('ruolo');
   if (!ruolo) { router.push('/'); return; }
-  
   try {
     const [resMappa, resReparti, resScaffali] = await Promise.all([
       api.get('/api/mappa/carica'),
@@ -361,27 +364,24 @@ onMounted(async () => {
     repartiDati.value = resReparti.data;
     scaffaliDati.value = resScaffali.data;
 
-    let prodottiTemp = [];
     try {
       const resProdotti = await api.get('/api/prodotti/carica'); 
-      prodottiTemp = resProdotti.data;
-      tuttiIProdotti.value = prodottiTemp;
-    } catch(e) { console.error("Errore API Prodotti"); }
+      tuttiIProdotti.value = resProdotti.data;
+    } catch(e) { console.error("Errore Prodotti:", e); }
 
     let lottiBackend = [];
     try {
       const resLotti = await api.get('/api/batch-prodotti/carica');
       lottiBackend = resLotti.data;
-    } catch (e) { console.error("Errore API Lotti"); }
+    } catch (e) { console.error("Errore Lotti:", e); }
 
     let scaffaliBackend = [];
     try {
       const resBatchScaffali = await api.get('/api/batch-scaffale/carica');
       scaffaliBackend = resBatchScaffali.data;
       batchScaffaliDati.value = scaffaliBackend;
-    } catch (e) { console.error("Errore API Batch Scaffali"); }
+    } catch (e) { console.error("Errore API Batch Scaffali:", e); }
 
-    // CALCOLO RIMANENZE REALI
     if (lottiBackend.length > 0) {
       const lottiCalcolati = lottiBackend.map(lotto => {
         const qtaGiaAssegnata = scaffaliBackend
@@ -463,9 +463,7 @@ onMounted(async () => {
 
                       <button v-if="!isEditing" @click.stop="apriInfoScaffale(cella)" class="btn-info-mini" title="Info Scaffale"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></button>
                       <div class="piano-controls" v-if="!isEditing">
-                        <!-- Disabilita se si è a 0 o inferiore -->
                         <button @click.stop="cambiaPiano(cella.id, cella.idScaffale, -1)" :disabled="getPiano(cella.id) <= 0" class="btn-piano-mini"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg></button>
-                        <!-- VISUALIZZA + 1 PER L'UTENTE -->
                         <span class="piano-text">P{{ getPiano(cella.id) + 1 }}</span>
                         <button @click.stop="cambiaPiano(cella.id, cella.idScaffale, 1)" :disabled="getPiano(cella.id) >= ((getDatiTecniciScaffale(cella.idScaffale)?.max_altezza - 1) || 0)" class="btn-piano-mini"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg></button>
                       </div>
@@ -482,7 +480,6 @@ onMounted(async () => {
                       @click.stop="gestisciClickCella(cella, slotIndex)"
                     >
                       <div v-if="haPiano(cella) && getSlotStatus(cella, slotIndex) !== 'vuoto'" class="batch-placeholder" :class="getSlotStatus(cella, slotIndex)">
-                         <!-- Nello span, le funzioni ricevono le coordinate in BASE 0 per la calcolazione matematica interna -->
                          <span class="spazio-indicatore">{{ calcolaSpazioOccupatoCella(cella.id, getPiano(cella.id), Math.floor((slotIndex-1) / (cella.orientamentoScaffale === 'ORIZZONTALE' ? getDatiTecniciScaffale(cella.idScaffale).max_righe : getDatiTecniciScaffale(cella.idScaffale).max_colonne)), ((slotIndex-1) % (cella.orientamentoScaffale === 'ORIZZONTALE' ? getDatiTecniciScaffale(cella.idScaffale).max_righe : getDatiTecniciScaffale(cella.idScaffale).max_colonne))) }}/{{ MAX_SPAZIO_CELLA }}</span>
                       </div>
                     </div>
@@ -496,7 +493,6 @@ onMounted(async () => {
       </main>
     </div>
 
-    <!-- PANNELLO FLOTTANTE ASSEGNAZIONE -->
     <div v-if="!isEditing" class="floating-assignment-panel">
       <div class="panel-header">
         <h3>Merce da Assegnare</h3>
@@ -527,38 +523,33 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- MODALE INFO CELLA E RIMOZIONE MERCE -->
     <div v-if="cellaDettaglioAttiva" class="modal-overlay" @click="chiudiDettaglioCella">
       <div class="modal-content-large" @click.stop>
         <div class="modal-header">
-          <!-- VISUALIZZA + 1 PER L'UTENTE -->
           <h3>Dettaglio Slot <span class="text-blue">R{{ cellaDettaglioAttiva.riga + 1 }} - C{{ cellaDettaglioAttiva.colonna + 1 }}</span></h3>
-          <button @click="chiudiDettaglioCella" class="btn-close-modal"><svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+          <button @click="chiudiDettaglioCella" class="btn-close-modal">
+            <svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
         </div>
         <div class="modal-body">
           <div class="info-row highlight-row">
             <span class="info-label">Spazio Utilizzato:</span>
             <span class="info-value" :class="{'text-red-500': cellaDettaglioAttiva.spazioOccupato > 90}">{{ cellaDettaglioAttiva.spazioOccupato }} / {{ MAX_SPAZIO_CELLA }}</span>
           </div>
-          
           <h4 class="mt-4 mb-2 font-bold text-gray-700">Lotti presenti nello slot:</h4>
-          
           <div class="lotti-lista-modal">
             <div v-for="item in cellaDettaglioAttiva.elementi" :key="item.idBatchProdotti" class="lotto-modal-item" :class="{'border-l-4 border-yellow-500': item.isNuovo, 'border-l-4 border-blue-500': !item.isNuovo}">
               <div class="flex justify-between items-center">
                 <span class="font-bold">Lotto #{{ item.idBatchProdotti }}</span>
                 <span class="badge" :class="item.isNuovo ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'">
-                  {{ item.isNuovo ? 'Nuovo (non salvato)' : 'Salvato nel DB' }}
+                  {{ item.isNuovo ? 'Nuovo' : 'Salvato' }}
                 </span>
               </div>
-              <div class="text-sm text-gray-600 mt-1 font-bold">
-                {{ item.prodotto ? item.prodotto.nome : 'Prodotto Sconosciuto' }}
-              </div>
+              <div class="text-sm text-gray-600 mt-1 font-bold">{{ item.prodotto ? item.prodotto.nome : 'Sconosciuto' }}</div>
               <div class="flex justify-between mt-2 text-sm text-gray-500">
                 <span>In cella: <strong>{{ item.qta }} pz</strong></span>
                 <span>Peso: <strong>{{ Math.round(item.qta * (item.prodotto?.pesoUnitario || 0) * 10) / 10 }} kg</strong></span>
               </div>
-              
               <div class="removal-controls mt-3">
                 <label>Rimuovi:</label>
                 <div class="flex gap-2">
@@ -566,17 +557,13 @@ onMounted(async () => {
                   <button @click="rimuoviDaCella(item)" class="btn-remove-sm">Togli</button>
                 </div>
               </div>
-
             </div>
           </div>
-          <div v-if="cellaDettaglioAttiva.elementi.length === 0" class="text-center text-gray-500 py-4">
-            Questo slot è vuoto.
-          </div>
+          <div v-if="cellaDettaglioAttiva.elementi.length === 0" class="text-center text-gray-500 py-4">Slot vuoto.</div>
         </div>
       </div>
     </div>
 
-    <!-- MODALE INFO SCAFFALE -->
     <div v-if="scaffaleInfoAttivo" class="modal-overlay" @click="chiudiInfoScaffale">
       <div class="modal-content" @click.stop>
         <div class="modal-header">
@@ -584,15 +571,12 @@ onMounted(async () => {
           <button @click="chiudiInfoScaffale" class="btn-close-modal"><svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
         </div>
         <div class="modal-body">
-          <div class="info-row"><span class="info-label">Posizione Rilevata:</span><span class="info-value">X: {{ scaffaleInfoAttivo.coordinataX }}, Y: {{ scaffaleInfoAttivo.coordinataY }}</span></div>
-          <div class="info-row"><span class="info-label">Orientamento:</span><span class="info-value">{{ scaffaleInfoAttivo.orientamentoScaffale }}</span></div>
-          <div class="info-row"><span class="info-label">Dimensioni:</span><span class="info-value">{{ getDatiTecniciScaffale(scaffaleInfoAttivo.idScaffale)?.max_colonne }} x {{ getDatiTecniciScaffale(scaffaleInfoAttivo.idScaffale)?.max_righe }}</span></div>
+          <div class="info-row"><span class="info-label">X: {{ scaffaleInfoAttivo.coordinataX }}, Y: {{ scaffaleInfoAttivo.coordinataY }}</span></div>
           <div class="info-row"><span class="info-label">Piani:</span><span class="info-value">{{ getDatiTecniciScaffale(scaffaleInfoAttivo.idScaffale)?.max_altezza }}</span></div>
-          <div class="info-row highlight-row"><span class="info-label">Peso Occupato:</span><span class="info-value">{{ calcolaPesoOccupatoScaffale(scaffaleInfoAttivo.id) }} / {{ getDatiTecniciScaffale(scaffaleInfoAttivo.idScaffale)?.max_peso || 'N/A' }} Kg</span></div>
+          <div class="info-row highlight-row"><span class="info-label">Peso:</span><span class="info-value">{{ calcolaPesoOccupatoScaffale(scaffaleInfoAttivo.id) }} / {{ getDatiTecniciScaffale(scaffaleInfoAttivo.idScaffale)?.max_peso || 'N/A' }} Kg</span></div>
         </div>
       </div>
     </div>
-
   </div>
 </template>
 
