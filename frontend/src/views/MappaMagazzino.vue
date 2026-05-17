@@ -17,11 +17,15 @@ const tuttiIBatch = ref([]);
 const lottiSospesi = ref([]);
 const batchScaffaliDati = ref([]);
 
+const tutteLeEtichette = ref([]); 
+const etProdDati = ref([]); // La tua tabella di giunzione Etichette-Prodotti
+
 const nuoviAssegnamenti = ref([]); 
 const modifichePendenti = ref([]); 
 
 const lottoDaAssegnare = ref(null);
 const quantitaSelezionata = ref(1);
+const cellaSuggerita = ref(null);
 
 const repartoVisuale = computed(() => {
   const idRepartoSelezionato = parseInt(route.params.id);
@@ -42,7 +46,7 @@ const isSavingAssignments = ref(false);
 const scaffaleSelezionato = ref(null);
 let mappaOriginale = [];
 
-// --- GESTIONE PIANI (BASE 0 IN MEMORIA, BASE 1 IN UI) ---
+// --- GESTIONE PIANI (BASE 0) ---
 const pianiMappa = ref({}); 
 
 const getPiano = (idMappa) => {
@@ -80,6 +84,24 @@ const getNomeProdotto = (idProdotto) => {
   return prod ? prod.nome : `Sconosciuto (ID: ${idProdotto})`;
 };
 
+// Helper per formattare la data di scadenza
+const formatData = (dataString) => {
+  if (!dataString) return 'N/A';
+  const d = new Date(dataString);
+  if (isNaN(d.getTime())) return dataString; 
+  return d.toLocaleDateString('it-IT');
+};
+
+// Recupera le etichette per la UI
+const getEtichetteProdotto = (idProdotto) => {
+  const etichetteIds = etProdDati.value
+    .filter(ep => Number(ep.idProdotto) === Number(idProdotto))
+    .map(ep => Number(ep.idEtichetta));
+
+  return tutteLeEtichette.value.filter(e => etichetteIds.includes(e.id));
+};
+
+
 const MAX_SPAZIO_CELLA = 100;
 
 const calcolaSpazioOccupatoCella = (idMappa, altezza, riga, colonna) => {
@@ -107,12 +129,125 @@ const calcolaPesoOccupatoScaffale = (idMappa) => {
   return Math.round(peso * 10) / 10;
 };
 
-// --- LOGICA DEL MODALE E RIMOZIONE ---
-const cellaDettaglioAttiva = ref(null);
+// --- LOGICA ETICHETTE E SCORING (SMART PUTAWAY) ---
+const calcolaMatchEtichette = (p1, p2) => {
+  if (!p1 || !p2) return 0;
+  
+  const etichetteP1 = etProdDati.value
+    .filter(ep => Number(ep.idProdotto) === Number(p1.id))
+    .map(ep => Number(ep.idEtichetta));
 
-const chiudiDettaglioCella = () => { 
-  cellaDettaglioAttiva.value = null; 
+  const etichetteP2 = etProdDati.value
+    .filter(ep => Number(ep.idProdotto) === Number(p2.id))
+    .map(ep => Number(ep.idEtichetta));
+  
+  if (etichetteP1.length === 0 || etichetteP2.length === 0) return 0;
+
+  let matches = 0;
+  etichetteP1.forEach(idEtichetta => { 
+    if (etichetteP2.includes(idEtichetta)) matches++; 
+  });
+  
+  return matches;
 };
+
+const suggerisciPosizione = (lotto) => {
+  if (!lottoDaAssegnare.value || lottoDaAssegnare.value.id !== lotto.id) {
+    selezionaLotto(lotto);
+  }
+
+  const prodottoDaPiazzare = getProdottoDaBatch(lotto.id);
+  if (!prodottoDaPiazzare) return;
+
+  const spazioDiUnPezzo = prodottoDaPiazzare.spazioUnitario || 1;
+  const pesoDiUnPezzo = prodottoDaPiazzare.pesoUnitario || 0;
+
+  let bestScore = -1;
+  let bestSlot = null;
+
+  const scaffaliReparto = getScaffaliPerReparto(repartoVisuale.value.id);
+  const tuttaLaMerce = [...batchScaffaliDati.value, ...nuoviAssegnamenti.value];
+
+  scaffaliReparto.forEach(cellaMappa => {
+    const infoScaffale = getDatiTecniciScaffale(cellaMappa.idScaffale);
+    if (!infoScaffale) return;
+
+    const pesoAttuale = calcolaPesoOccupatoScaffale(cellaMappa.id);
+    if (pesoAttuale + pesoDiUnPezzo > (infoScaffale.max_peso || 9999)) return;
+
+    const isOrizzontale = cellaMappa.orientamentoScaffale === 'ORIZZONTALE';
+    const spanX = isOrizzontale ? infoScaffale.max_righe : infoScaffale.max_colonne;
+    const spanY = isOrizzontale ? infoScaffale.max_colonne : infoScaffale.max_righe;
+
+    for (let piano = 0; piano < infoScaffale.max_altezza; piano++) {
+      for (let rigaLocale = 0; rigaLocale < spanY; rigaLocale++) {
+        for (let colonnaLocale = 0; colonnaLocale < spanX; colonnaLocale++) {
+          
+          const spazioAttuale = calcolaSpazioOccupatoCella(cellaMappa.id, piano, rigaLocale, colonnaLocale);
+          if (spazioAttuale + spazioDiUnPezzo > MAX_SPAZIO_CELLA) continue;
+
+          let score = 0;
+          if (spazioAttuale === 0) score += 5;
+
+          const merceNelloSlot = tuttaLaMerce.filter(bs => 
+            Number(bs.idMappa) === Number(cellaMappa.id) && Number(bs.altezza) === piano && 
+            Number(bs.riga) === rigaLocale && Number(bs.colonna) === colonnaLocale && bs.qta > 0
+          );
+
+          merceNelloSlot.forEach(item => {
+            const prodInSlot = getProdottoDaBatch(item.idBatchProdotti);
+            if (prodInSlot) {
+              if (prodInSlot.id === prodottoDaPiazzare.id) {
+                score += 100;
+              }
+              score += (calcolaMatchEtichette(prodottoDaPiazzare, prodInSlot) * 2); 
+            }
+          });
+
+          const merceAdiacente = tuttaLaMerce.filter(bs =>
+            Number(bs.idMappa) === Number(cellaMappa.id) && Number(bs.altezza) === piano && bs.qta > 0 &&
+            (
+              (Number(bs.riga) === rigaLocale + 1 && Number(bs.colonna) === colonnaLocale) ||
+              (Number(bs.riga) === rigaLocale - 1 && Number(bs.colonna) === colonnaLocale) ||
+              (Number(bs.riga) === rigaLocale && Number(bs.colonna) === colonnaLocale + 1) ||
+              (Number(bs.riga) === rigaLocale && Number(bs.colonna) === colonnaLocale - 1)
+            )
+          );
+
+          merceAdiacente.forEach(item => {
+             const prodInAdiacente = getProdottoDaBatch(item.idBatchProdotti);
+             if (prodInAdiacente && prodInAdiacente.id === prodottoDaPiazzare.id) score += 10;
+          });
+
+          if (score > bestScore) {
+            bestScore = score;
+            bestSlot = { idMappa: cellaMappa.id, piano, riga: rigaLocale, colonna: colonnaLocale, score };
+          }
+        }
+      }
+    }
+  });
+
+  if (bestSlot && bestScore >= 0) {
+    cellaSuggerita.value = bestSlot;
+    pianiMappa.value[bestSlot.idMappa] = bestSlot.piano; 
+  } else {
+    cellaSuggerita.value = null;
+    alert("Nessuno spazio disponibile o compatibile trovato nel reparto.");
+  }
+};
+
+const isCellaSuggerita = (idMappa, pianoAttuale, rigaLocale, colonnaLocale) => {
+  if (!cellaSuggerita.value) return false;
+  return cellaSuggerita.value.idMappa === idMappa &&
+         cellaSuggerita.value.piano === pianoAttuale &&
+         cellaSuggerita.value.riga === rigaLocale &&
+         cellaSuggerita.value.colonna === colonnaLocale;
+};
+
+// --- LOGICA MODALE E RIMOZIONE ---
+const cellaDettaglioAttiva = ref(null);
+const chiudiDettaglioCella = () => { cellaDettaglioAttiva.value = null; };
 
 const apriModaleDettaglio = (cella, rigaLocale, colonnaLocale, pianoAttuale) => {
   const merceCellaVecchia = batchScaffaliDati.value.filter(bs => 
@@ -129,13 +264,17 @@ const apriModaleDettaglio = (cella, rigaLocale, colonnaLocale, pianoAttuale) => 
   cellaDettaglioAttiva.value = {
     idMappa: cella.id, scaffaleId: cella.idScaffale, riga: rigaLocale, colonna: colonnaLocale, piano: pianoAttuale,
     spazioOccupato: calcolaSpazioOccupatoCella(cella.id, pianoAttuale, rigaLocale, colonnaLocale),
-    elementi: merceMista.map(item => ({
-      ...item, 
-      refOriginale: item, 
-      prodotto: getProdottoDaBatch(item.idBatchProdotti),
-      isNuovo: merceCellaNuova.includes(item),
-      qtaRimuovere: 1 
-    }))
+    elementi: merceMista.map(item => {
+      const batchInfo = tuttiIBatch.value.find(b => Number(b.id) === Number(item.idBatchProdotti));
+      return {
+        ...item, 
+        refOriginale: item, 
+        batch: batchInfo, // Aggiunto per poter recuperare la data di scadenza
+        prodotto: getProdottoDaBatch(item.idBatchProdotti),
+        isNuovo: merceCellaNuova.includes(item),
+        qtaRimuovere: 1 
+      };
+    })
   };
 };
 
@@ -148,7 +287,7 @@ const rimuoviDaCella = (elementoModale) => {
   let lottoInSidebar = lottiSospesi.value.find(l => Number(l.id) === Number(elementoModale.idBatchProdotti));
   if (!lottoInSidebar) {
     lottoInSidebar = tuttiIBatch.value.find(b => Number(b.id) === Number(elementoModale.idBatchProdotti));
-    if (lottoInSidebar) lottiSospesi.value.unshift(lottoInSidebar); // RIMETTE IN CIMA
+    if (lottoInSidebar) lottiSospesi.value.unshift(lottoInSidebar);
   }
 
   if (lottoInSidebar) lottoInSidebar.quantita += qtaTogliere;
@@ -159,7 +298,6 @@ const rimuoviDaCella = (elementoModale) => {
   if (elementoModale.isNuovo) {
     if (elementoModale.refOriginale.qta <= 0) nuoviAssegnamenti.value = nuoviAssegnamenti.value.filter(na => na !== elementoModale.refOriginale);
   } else {
-    // Gestione Tracciamento Modifica (Copia anche l'id per il backend)
     let tracciaModifica = modifichePendenti.value.find(m => Number(m.id) === Number(elementoModale.refOriginale.id));
     if (!tracciaModifica) {
       tracciaModifica = { ...elementoModale.refOriginale };
@@ -167,19 +305,22 @@ const rimuoviDaCella = (elementoModale) => {
     }
     tracciaModifica.qta = elementoModale.refOriginale.qta;
     
-    // Aggiornamento puramente visivo della griglia
     if (elementoModale.refOriginale.qta <= 0) {
       batchScaffaliDati.value = batchScaffaliDati.value.filter(bs => Number(bs.id) !== Number(elementoModale.refOriginale.id));
     }
   }
 
-  // Pulizia visiva modale
   if (elementoModale.qta <= 0) cellaDettaglioAttiva.value.elementi = cellaDettaglioAttiva.value.elementi.filter(e => e !== elementoModale);
   cellaDettaglioAttiva.value.spazioOccupato = calcolaSpazioOccupatoCella(cellaDettaglioAttiva.value.idMappa, cellaDettaglioAttiva.value.piano, cellaDettaglioAttiva.value.riga, cellaDettaglioAttiva.value.colonna);
+  
+  if(lottoDaAssegnare.value && Number(lottoDaAssegnare.value.id) === Number(elementoModale.idBatchProdotti)) {
+    quantitaSelezionata.value = 1;
+  }
+
   if (cellaDettaglioAttiva.value.elementi.length === 0) chiudiDettaglioCella();
 };
 
-// --- GESTISCI CLICK SULLO SLOT ---
+// --- GESTISCI CLICK SULLO SLOT E INSERIMENTO ---
 const gestisciClickCella = (cella, slotIndex) => {
   if (isEditing.value) return;
 
@@ -210,46 +351,62 @@ const gestisciClickCella = (cella, slotIndex) => {
 
     lottoDaAssegnare.value.quantita -= quantitaSelezionata.value;
 
-    const payload = {
-      // Niente ID qui: il backend capirà che è un inserimento
-      idMappa: cella.id, 
-      idBatchProdotti: lottoDaAssegnare.value.id,
-      colonna: colonnaLocale, 
-      riga: rigaLocale, 
-      altezza: pianoAttuale, 
-      qta: quantitaSelezionata.value
-    };
-
-    const indexEsistenteNuovo = nuoviAssegnamenti.value.findIndex(a => 
-      Number(a.idMappa) === Number(cella.id) && Number(a.altezza) === Number(pianoAttuale) && 
-      Number(a.riga) === Number(rigaLocale) && Number(a.colonna) === Number(colonnaLocale) && 
-      Number(a.idBatchProdotti) === Number(payload.idBatchProdotti)
+    const bsEsistente = batchScaffaliDati.value.find(bs => 
+      Number(bs.idMappa) === Number(cella.id) && 
+      Number(bs.altezza) === Number(pianoAttuale) && 
+      Number(bs.riga) === Number(rigaLocale) && 
+      Number(bs.colonna) === Number(colonnaLocale) && 
+      Number(bs.idBatchProdotti) === Number(lottoDaAssegnare.value.id)
     );
-    
-    if (indexEsistenteNuovo >= 0) nuoviAssegnamenti.value[indexEsistenteNuovo].qta += payload.qta;
-    else nuoviAssegnamenti.value.push(payload);
+
+    if (bsEsistente) {
+      bsEsistente.qta += quantitaSelezionata.value;
+      const modEsistente = modifichePendenti.value.find(m => Number(m.id) === Number(bsEsistente.id));
+      if (modEsistente) {
+        modEsistente.qta = bsEsistente.qta;
+      } else {
+        modifichePendenti.value.push({ ...bsEsistente });
+      }
+    } else {
+      const payload = {
+        idMappa: cella.id, 
+        idBatchProdotti: lottoDaAssegnare.value.id,
+        colonna: colonnaLocale, 
+        riga: rigaLocale, 
+        altezza: pianoAttuale, 
+        qta: quantitaSelezionata.value
+      };
+
+      const indexEsistenteNuovo = nuoviAssegnamenti.value.findIndex(a => 
+        Number(a.idMappa) === Number(cella.id) && Number(a.altezza) === Number(pianoAttuale) && 
+        Number(a.riga) === Number(rigaLocale) && Number(a.colonna) === Number(colonnaLocale) && 
+        Number(a.idBatchProdotti) === Number(payload.idBatchProdotti)
+      );
+      
+      if (indexEsistenteNuovo >= 0) nuoviAssegnamenti.value[indexEsistenteNuovo].qta += payload.qta;
+      else nuoviAssegnamenti.value.push(payload);
+    }
 
     if (lottoDaAssegnare.value.quantita <= 0) {
       lottiSospesi.value = lottiSospesi.value.filter(l => Number(l.id) !== Number(lottoDaAssegnare.value.id));
       lottoDaAssegnare.value = null;
-    } else quantitaSelezionata.value = lottoDaAssegnare.value.quantita;
+    } else {
+      quantitaSelezionata.value = 1;
+    }
+    
+    cellaSuggerita.value = null; 
 
   } else {
     apriModaleDettaglio(cella, rigaLocale, colonnaLocale, pianoAttuale);
   }
 };
 
-// --- SALVATAGGIO (UNIFICATO) ---
 const salvaAssegnamenti = async () => {
   if (nuoviAssegnamenti.value.length === 0 && modifichePendenti.value.length === 0) return;
   isSavingAssignments.value = true;
   try {
-    // Uniamo le due liste in un solo array come avevamo detto
     const payloadSingolo = [...nuoviAssegnamenti.value, ...modifichePendenti.value];
-    
-    // RIMESSO L'URL ORIGINALE CHE FUNZIONA NEL TUO BACKEND: /salva
     await api.post('/api/batch-scaffale/salva', payloadSingolo);
-    
     alert("Dati salvati e sincronizzati con successo!");
     window.location.reload(); 
   } catch (error) { 
@@ -266,6 +423,7 @@ const annullaAssegnamenti = () => { window.location.reload(); };
 const selezionaLotto = (lotto) => {
   if (lottoDaAssegnare.value && Number(lottoDaAssegnare.value.id) === Number(lotto.id)) {
     lottoDaAssegnare.value = null; 
+    cellaSuggerita.value = null;
   } else {
     lottoDaAssegnare.value = lotto;
     quantitaSelezionata.value = 1; 
@@ -355,14 +513,18 @@ onMounted(async () => {
   const ruolo = sessionStorage.getItem('ruolo');
   if (!ruolo) { router.push('/'); return; }
   try {
-    const [resMappa, resReparti, resScaffali] = await Promise.all([
+    const [resMappa, resReparti, resScaffali, resEtichette, resEtProd] = await Promise.all([
       api.get('/api/mappa/carica'),
       api.get('/api/reparti/carica'),
-      api.get('/api/scaffali/carica')
+      api.get('/api/scaffali/carica'),
+      api.get('/api/etichette/carica').catch(() => ({ data: [] })),
+      api.get('/api/etprod/carica').catch(() => ({ data: [] }))
     ]);
     mappaDati.value = resMappa.data;
     repartiDati.value = resReparti.data;
     scaffaliDati.value = resScaffali.data;
+    tutteLeEtichette.value = resEtichette.data;
+    etProdDati.value = resEtProd.data;
 
     try {
       const resProdotti = await api.get('/api/prodotti/carica'); 
@@ -476,7 +638,16 @@ onMounted(async () => {
                       v-for="slotIndex in calcolaNumeroSlot(cella)" 
                       :key="slotIndex" 
                       class="slot-1x1"
-                      :class="{'cursor-assegna': lottoDaAssegnare && !isEditing, 'cursor-info': !lottoDaAssegnare && !isEditing && getSlotStatus(cella, slotIndex) !== 'vuoto'}"
+                      :class="{
+                        'cursor-assegna': lottoDaAssegnare && !isEditing, 
+                        'cursor-info': !lottoDaAssegnare && !isEditing && getSlotStatus(cella, slotIndex) !== 'vuoto',
+                        'is-suggested': isCellaSuggerita(
+                          cella.id, 
+                          getPiano(cella.id), 
+                          Math.floor((slotIndex - 1) / (cella.orientamentoScaffale === 'ORIZZONTALE' ? getDatiTecniciScaffale(cella.idScaffale).max_righe : getDatiTecniciScaffale(cella.idScaffale).max_colonne)), 
+                          ((slotIndex - 1) % (cella.orientamentoScaffale === 'ORIZZONTALE' ? getDatiTecniciScaffale(cella.idScaffale).max_righe : getDatiTecniciScaffale(cella.idScaffale).max_colonne))
+                        )
+                      }"
                       @click.stop="gestisciClickCella(cella, slotIndex)"
                     >
                       <div v-if="haPiano(cella) && getSlotStatus(cella, slotIndex) !== 'vuoto'" class="batch-placeholder" :class="getSlotStatus(cella, slotIndex)">
@@ -500,15 +671,46 @@ onMounted(async () => {
       </div>
       <div class="batch-list">
         <div v-for="lotto in lottiSospesi" :key="lotto.id" class="batch-card" :class="{'selected': lottoDaAssegnare?.id === lotto.id}" @click="selezionaLotto(lotto)">
+          
           <div class="batch-info">
-            <strong>Lotto #{{ lotto.id }}</strong>
-            <span class="text-blue font-bold">{{ getNomeProdotto(lotto.idProdotto) }}</span>
-            <span class="qta-totale">Disp: {{ lotto.quantita }} pz</span>
+            <div class="flex justify-between items-start">
+              <strong>Lotto #{{ lotto.id }}</strong>
+              <span class="badge bg-blue-100 text-blue-800 font-bold">Disp: {{ lotto.quantita }} pz</span>
+            </div>
+            
+            <span class="text-blue font-bold text-lg mt-1 block">{{ getNomeProdotto(lotto.idProdotto) }}</span>
+            
+            <div class="dettagli-tecnici mt-2">
+              <div class="dettaglio-item" v-if="lotto.scadenza || lotto.dataScadenza">
+                <svg class="icon-tiny" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                Scadenza: {{ formatData(lotto.scadenza || lotto.dataScadenza) }}
+              </div>
+              <div class="dettaglio-item">
+                <svg class="icon-tiny" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"></path></svg>
+                Peso Un.: {{ getProdottoDaBatch(lotto.id)?.pesoUnitario }} kg
+              </div>
+              <div class="dettaglio-item">
+                <svg class="icon-tiny" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
+                Spazio Un.: {{ getProdottoDaBatch(lotto.id)?.spazioUnitario }}/{{ MAX_SPAZIO_CELLA }}
+              </div>
+            </div>
+
+            <div class="etichette-container mt-2" v-if="getEtichetteProdotto(lotto.idProdotto).length > 0">
+              <span v-for="et in getEtichetteProdotto(lotto.idProdotto)" :key="et.id" class="etichetta-pill">
+                {{ et.nome }}
+              </span>
+            </div>
           </div>
+
           <div v-if="lottoDaAssegnare?.id === lotto.id" class="assegnazione-controls" @click.stop>
-            <label>Qta da piazzare:</label>
+            <div class="flex justify-between items-center mb-2 mt-2">
+              <label>Qta da piazzare:</label>
+              <button @click.stop="suggerisciPosizione(lotto)" class="btn-suggerisci">
+                💡 Suggerisci
+              </button>
+            </div>
             <input type="number" v-model.number="quantitaSelezionata" min="1" :max="lotto.quantita" />
-            <p class="help-text">Clicca su uno slot per inserire.</p>
+            <p class="help-text">Clicca su uno slot blu per inserire.</p>
           </div>
         </div>
         <div v-if="lottiSospesi.length === 0" class="empty-list">Nessun lotto in attesa.</div>
@@ -537,19 +739,46 @@ onMounted(async () => {
             <span class="info-value" :class="{'text-red-500': cellaDettaglioAttiva.spazioOccupato > 90}">{{ cellaDettaglioAttiva.spazioOccupato }} / {{ MAX_SPAZIO_CELLA }}</span>
           </div>
           <h4 class="mt-4 mb-2 font-bold text-gray-700">Lotti presenti nello slot:</h4>
+          
           <div class="lotti-lista-modal">
             <div v-for="item in cellaDettaglioAttiva.elementi" :key="item.idBatchProdotti" class="lotto-modal-item" :class="{'border-l-4 border-yellow-500': item.isNuovo, 'border-l-4 border-blue-500': !item.isNuovo}">
-              <div class="flex justify-between items-center">
+              
+              <div class="flex justify-between items-center mb-1">
                 <span class="font-bold">Lotto #{{ item.idBatchProdotti }}</span>
                 <span class="badge" :class="item.isNuovo ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'">
                   {{ item.isNuovo ? 'Nuovo' : 'Salvato' }}
                 </span>
               </div>
-              <div class="text-sm text-gray-600 mt-1 font-bold">{{ item.prodotto ? item.prodotto.nome : 'Sconosciuto' }}</div>
-              <div class="flex justify-between mt-2 text-sm text-gray-500">
-                <span>In cella: <strong>{{ item.qta }} pz</strong></span>
-                <span>Peso: <strong>{{ Math.round(item.qta * (item.prodotto?.pesoUnitario || 0) * 10) / 10 }} kg</strong></span>
+              
+              <span class="text-blue font-bold text-lg block">{{ item.prodotto ? item.prodotto.nome : 'Sconosciuto' }}</span>
+              
+              <div class="dettagli-tecnici-modal mt-2">
+                <div class="dettaglio-item" v-if="item.batch && (item.batch.scadenza || item.batch.dataScadenza)">
+                  <svg class="icon-tiny" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                  Scadenza: {{ formatData(item.batch.scadenza || item.batch.dataScadenza) }}
+                </div>
+                <div class="dettaglio-item">
+                  <svg class="icon-tiny" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"></path></svg>
+                  Peso Un.: {{ item.prodotto?.pesoUnitario }} kg
+                </div>
+                <div class="dettaglio-item">
+                  <svg class="icon-tiny" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
+                  Spazio Un.: {{ item.prodotto?.spazioUnitario }}/{{ MAX_SPAZIO_CELLA }}
+                </div>
               </div>
+
+              <div class="etichette-container mt-1" v-if="item.prodotto && getEtichetteProdotto(item.prodotto.id).length > 0">
+                <span v-for="et in getEtichetteProdotto(item.prodotto.id)" :key="et.id" class="etichetta-pill">
+                  {{ et.nome }}
+                </span>
+              </div>
+
+              <div class="totali-cella mt-3">
+                <span>In cella: <strong>{{ item.qta }} pz</strong></span>
+                <span>Peso tot: <strong>{{ Math.round(item.qta * (item.prodotto?.pesoUnitario || 0) * 10) / 10 }} kg</strong></span>
+                <span>Spazio tot: <strong>{{ Math.round(item.qta * (item.prodotto?.spazioUnitario || 1) * 10) / 10 }}</strong></span>
+              </div>
+
               <div class="removal-controls mt-3">
                 <label>Rimuovi:</label>
                 <div class="flex gap-2">
@@ -557,6 +786,7 @@ onMounted(async () => {
                   <button @click="rimuoviDaCella(item)" class="btn-remove-sm">Togli</button>
                 </div>
               </div>
+              
             </div>
           </div>
           <div v-if="cellaDettaglioAttiva.elementi.length === 0" class="text-center text-gray-500 py-4">Slot vuoto.</div>
@@ -590,6 +820,7 @@ onMounted(async () => {
 .content-area { flex: 1; padding: 20px 30px; display: flex; flex-direction: column; overflow: hidden; }
 .icon { width: 18px; height: 18px; }
 .icon-sm { width: 14px; height: 14px; }
+.icon-tiny { width: 12px; height: 12px; }
 .btn-back { display: flex; align-items: center; gap: 8px; background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; transition: all 0.2s; font-size: 0.9rem;}
 .btn-back:hover { background: #e2e8f0; color: #0f172a; }
 .btn { display: flex; align-items: center; gap: 8px; padding: 8px 16px; font-weight: 600; border-radius: 6px; cursor: pointer; border: none; transition: 0.2s; font-size: 0.9rem;}
@@ -672,16 +903,28 @@ onMounted(async () => {
 .slot-1x1.cursor-assegna:hover { background-color: rgba(16, 185, 129, 0.2); border-color: #10b981; }
 .slot-1x1.cursor-info:hover { background-color: rgba(59, 130, 246, 0.2); }
 
-.floating-assignment-panel { position: absolute; top: 90px; right: 30px; width: 280px; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border: 1px solid #cbd5e1; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); z-index: 100; display: flex; flex-direction: column; max-height: calc(100vh - 120px); overflow: hidden; }
+.floating-assignment-panel { position: absolute; top: 90px; right: 30px; width: 320px; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border: 1px solid #cbd5e1; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); z-index: 100; display: flex; flex-direction: column; max-height: calc(100vh - 120px); overflow: hidden; }
 .panel-header { background: #f8fafc; padding: 12px 16px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
 .panel-header h3 { margin: 0; font-size: 1rem; color: #0f172a; }
 .panel-header .badge { background: #3b82f6; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: bold;}
 .batch-list { padding: 10px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; flex: 1;}
-.batch-card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; cursor: pointer; transition: 0.2s; background: white; }
+.batch-card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; cursor: pointer; transition: 0.2s; background: white; }
 .batch-card:hover { border-color: #94a3b8; }
 .batch-card.selected { border-color: #10b981; box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2); background: #f0fdf4; }
-.batch-info { display: flex; flex-direction: column; font-size: 0.9rem; }
-.qta-totale { color: #64748b; font-size: 0.8rem; margin-top: 4px; font-weight: 600;}
+.batch-info { display: flex; flex-direction: column; }
+.qta-totale { font-weight: 600; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; }
+.text-lg { font-size: 1.1rem; }
+.block { display: block; }
+.mt-2 { margin-top: 0.5rem; }
+
+/* STILI INFO TECNICHE */
+.dettagli-tecnici { display: flex; flex-wrap: wrap; gap: 8px; background: #f1f5f9; padding: 8px; border-radius: 6px; font-size: 0.75rem; color: #475569; font-weight: 600; }
+.dettagli-tecnici-modal { display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.75rem; color: #475569; font-weight: 600; margin-bottom: 8px;}
+.dettaglio-item { display: flex; align-items: center; gap: 4px; }
+.etichette-container { display: flex; flex-wrap: wrap; gap: 4px; }
+.etichetta-pill { background: #e0e7ff; color: #1d4ed8; font-size: 0.65rem; padding: 2px 6px; border-radius: 10px; font-weight: bold; border: 1px solid #bfdbfe; }
+.totali-cella { display: flex; justify-content: space-between; font-size: 0.8rem; color: #334155; background: #fff; padding: 6px 10px; border-radius: 4px; border: 1px solid #cbd5e1; }
+
 .assegnazione-controls { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #cbd5e1; display: flex; flex-direction: column; gap: 5px; }
 .assegnazione-controls label { font-size: 0.8rem; font-weight: bold; color: #334155; }
 .assegnazione-controls input { padding: 6px; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit;}
@@ -710,8 +953,31 @@ onMounted(async () => {
 .btn-remove-sm { background: #ef4444; color: white; border: none; padding: 4px 10px; border-radius: 4px; font-weight: bold; cursor: pointer; transition: 0.2s;}
 .btn-remove-sm:hover { background: #dc2626;}
 
-.flex { display: flex; } .justify-between { justify-content: space-between; } .items-center { align-items: center; } .gap-2 { gap: 0.5rem; }
+.flex { display: flex; } .justify-between { justify-content: space-between; } .items-center { align-items: center; } .items-start { align-items: flex-start; } .gap-2 { gap: 0.5rem; }
 .mt-1 { margin-top: 0.25rem; } .mt-2 { margin-top: 0.5rem; } .mt-3 { margin-top: 0.75rem;} .mt-4 { margin-top: 1rem; } .mb-2 { margin-bottom: 0.5rem; }
 .py-4 { padding-top: 1rem; padding-bottom: 1rem; }
 .font-bold { font-weight: bold; } .text-sm { font-size: 0.875rem; } .text-gray-500 { color: #6b7280; } .text-gray-600 { color: #4b5563; } .text-gray-700 { color: #374151; } .text-center { text-align: center; }
+
+/* --- STILI PER LO SMART PUTAWAY --- */
+.btn-suggerisci {
+  background: #fdf2f8; color: #db2777; border: 1px solid #fbcfe8; 
+  padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; 
+  font-weight: bold; cursor: pointer; transition: 0.2s;
+  display: flex; align-items: center; gap: 4px;
+}
+.btn-suggerisci:hover { background: #fce7f3; box-shadow: 0 2px 4px rgba(219, 39, 119, 0.2); }
+
+.slot-1x1.is-suggested {
+  background-color: rgba(236, 72, 153, 0.2) !important;
+  border: 2px solid #db2777 !important;
+  box-shadow: 0 0 15px rgba(236, 72, 153, 0.6) inset, 0 0 10px rgba(236, 72, 153, 0.4);
+  animation: pulse-pink 1.5s infinite;
+  z-index: 10; 
+}
+
+@keyframes pulse-pink {
+  0% { box-shadow: 0 0 15px rgba(236, 72, 153, 0.6) inset, 0 0 5px rgba(236, 72, 153, 0.2); }
+  50% { box-shadow: 0 0 25px rgba(236, 72, 153, 0.8) inset, 0 0 15px rgba(236, 72, 153, 0.6); }
+  100% { box-shadow: 0 0 15px rgba(236, 72, 153, 0.6) inset, 0 0 5px rgba(236, 72, 153, 0.2); }
+}
 </style>
