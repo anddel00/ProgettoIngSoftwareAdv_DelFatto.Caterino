@@ -41,6 +41,22 @@ public class TaskController {
     }
 
     // ==========================================
+    // 1B. CREA MULTIPLI TASK E ASSEGNALI AUTOMATICAMENTE
+    // POST /api/tasks/crea-e-assegna-multipli
+    // ==========================================
+    @PostMapping("/crea-e-assegna-multipli")
+    public ResponseEntity<?> creaEAssegnaMultipli(@RequestBody List<CreaTaskDTO> dtos) {
+        try {
+            List<TaskDTO> tasksCreati = taskService.creaEAssegnaMultipli(dtos);
+            return ResponseEntity.ok(tasksCreati);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Errore nella creazione e assegnazione dei task.");
+        }
+    }
+
+    // ==========================================
     // 2. TASK DI UN DIPENDENTE (per homepage dipendente)
     // GET /api/tasks/miei-task?email=...
     // ==========================================

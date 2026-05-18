@@ -15,7 +15,7 @@ const fetchDipendenti = async () => {
     ])
     const emailInTurno = new Set(attiviR.data.map(d => d.email))
     dipendenti.value = tuttiR.data
-        .filter(u => u.ruolo?.nomeRuolo === 'Dipendente')
+        .filter(u => u.ruolo === 'Dipendente')
         .map(u => ({
           ...u,
           inTurno: emailInTurno.has(u.email)

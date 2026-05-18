@@ -31,11 +31,11 @@ public class Task {
 
     @ManyToOne
     @JoinColumn(name = "\"Id_ScaffaleInizio\"")
-    private Scaffali scaffale_inizio;
+    private Mappa scaffale_inizio;
 
     @ManyToOne
     @JoinColumn(name = "\"Id_ScaffaleFine\"") 
-    private Scaffali scaffale_fine;
+    private Mappa scaffale_fine;
 
     @Column(name = "\"VecchiaX\"")
     private int vecchia_x;
@@ -60,7 +60,7 @@ public class Task {
     public Task() {
     }
 
-    public Task(String descrizione, String tipo_task, BatchProdotti batch_prodotti, Scaffali scaffale_inizio, Scaffali scaffale_fine, int vecchia_x, int vecchia_y, int vecchia_z, int nuova_x, int nuova_y, int nuova_z, String stato_task, int qta_spostata) {
+    public Task(String descrizione, String tipo_task, BatchProdotti batch_prodotti, Mappa scaffale_inizio, Mappa scaffale_fine, int vecchia_x, int vecchia_y, int vecchia_z, int nuova_x, int nuova_y, int nuova_z, String stato_task, int qta_spostata) {
         this.descrizione = descrizione;
         this.tipo_task = tipo_task;
         this.batch_prodotti = batch_prodotti;
@@ -108,19 +108,19 @@ public class Task {
         this.batch_prodotti = batch_prodotti;
     }
 
-    public Scaffali getScaffale_inizio() {
+    public Mappa getScaffale_inizio() {
         return scaffale_inizio;
     }
 
-    public void setScaffale_inizio(Scaffali scaffale_inizio) {
+    public void setScaffale_inizio(Mappa scaffale_inizio) {
         this.scaffale_inizio = scaffale_inizio;
     }
 
-    public Scaffali getScaffale_fine() {
+    public Mappa getScaffale_fine() {
         return scaffale_fine;
     }
 
-    public void setScaffale_fine(Scaffali scaffale_fine) {
+    public void setScaffale_fine(Mappa scaffale_fine) {
         this.scaffale_fine = scaffale_fine;
     }
 

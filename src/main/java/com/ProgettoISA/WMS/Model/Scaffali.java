@@ -31,12 +31,6 @@ public class Scaffali {
     @Column(name = "\"MaxPeso\"")
     private int max_peso;
 
-    @OneToMany(mappedBy = "scaffale_inizio")
-    private List<Task> task_scaffali_inizio = new ArrayList<>();
-
-    @OneToMany(mappedBy = "scaffale_fine")
-    private List<Task> task_scaffali_fine = new ArrayList<>();
-
     @OneToMany(mappedBy = "scaffale")
     private List<Mappa> mappa_scaffali = new ArrayList<>();
 
@@ -89,15 +83,6 @@ public class Scaffali {
     public void setMax_peso(int max_peso) {
         this.max_peso = max_peso;
     }
-
-    public List<Task> getTask_scaffali_inizio() {
-        return task_scaffali_inizio;
-    }
-
-    public List<Task> getTask_scaffali_fine() {
-        return task_scaffali_fine;
-    }
-
 
     public List<Mappa> getMappa_scaffali() {
         return mappa_scaffali;

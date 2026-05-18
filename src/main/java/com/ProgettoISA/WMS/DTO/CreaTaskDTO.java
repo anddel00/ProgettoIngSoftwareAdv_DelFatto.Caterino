@@ -7,11 +7,18 @@ public class CreaTaskDTO {
     private int quantita;
     private String emailDipendente; // A quale dipendente assegnare il task
 
+    private Long idBatch;
+    private Long idScaffaleInizio;
+    private Long idScaffaleFine;
+
     // Posizioni opzionali (default 0 se non specificate)
     private int vecchiaX;
     private int vecchiaY;
+    private int vecchiaZ;
     private int nuovaX;
     private int nuovaY;
+    private int nuovaZ;
+
 
     public CreaTaskDTO() {}
 
@@ -38,4 +45,20 @@ public class CreaTaskDTO {
 
     public int getNuovaY() { return nuovaY; }
     public void setNuovaY(int nuovaY) { this.nuovaY = nuovaY; }
+
+    public Long getIdBatch() { return idBatch; }
+    public void setIdBatch(Long idBatch) { this.idBatch = idBatch; }
+    
+    public Long getIdScaffaleInizio() { return idScaffaleInizio; }
+    public void setIdScaffaleInizio(Long idScaffaleInizio) { this.idScaffaleInizio = idScaffaleInizio; }
+    
+    public Long getIdScaffaleFine() { return idScaffaleFine; }
+    public void setIdScaffaleFine(Long idScaffaleFine) { this.idScaffaleFine = idScaffaleFine; }
+    
+    public int getVecchiaZ() { return vecchiaZ; }
+    public void setVecchiaZ(int vecchiaZ) { this.vecchiaZ = vecchiaZ; }
+    
+    public int getNuovaZ() { return nuovaZ; }
+    public void setNuovaZ(int nuovaZ) { this.nuovaZ = nuovaZ; }
+
 }

@@ -186,9 +186,9 @@ const vaiAStorico = () => { router.push('/StoricoMovimenti') }
               <button @click="vaiAStorico" class="btn-glass-ghost">Storico</button>
             </div>
 
-            <div v-if="ultimiCompletati.length > 0" class="inbound-list">
-              <div v-for="task in ultimiCompletati" :key="task.id" class="inbound-item glass-item">
-                <div class="inbound-info">
+            <div v-if="ultimiCompletati.length > 0" class="task-list">
+              <div v-for="task in ultimiCompletati" :key="task.id" class="task-item glass-item">
+                <div class="task-info">
                   <div class="task-header">
                     <span class="task-id">#TSK-{{ task.id }}</span>
                     <span class="glass-badge badge-success">COMPLETATO</span>
@@ -211,16 +211,16 @@ const vaiAStorico = () => { router.push('/StoricoMovimenti') }
               <button @click="vaiAGestioneTask" class="btn-glass-ghost">Gestisci</button>
             </div>
 
-            <div v-if="attivitaInCorso.length > 0" class="inbound-list">
-              <div v-for="task in attivitaInCorso" :key="task.id" class="inbound-item glass-item">
-                <div class="inbound-info">
+            <div v-if="attivitaInCorso.length > 0" class="task-list">
+              <div v-for="task in attivitaInCorso" :key="task.id" class="task-item glass-item">
+                <div class="task-info">
                   <div class="task-header">
                     <span class="task-id">#TSK-{{ task.id }}</span>
                     <span class="glass-badge badge-active">IN CARICO</span>
                   </div>
                   <p class="item-desc">{{ task.descrizione }}</p>
                 </div>
-                <div class="inbound-meta">
+                <div class="task-meta">
                   <div class="operator-chip">
                     <div class="mini-avatar">{{ task.nomeDipendente ? task.nomeDipendente.charAt(0) : 'O' }}</div>
                     <span>{{ task.nomeDipendente || 'Operatore' }}</span>
@@ -442,7 +442,7 @@ const vaiAStorico = () => { router.push('/StoricoMovimenti') }
 }
 .btn-glass-ghost:hover { background: rgba(255, 255, 255, 0.8); color: #0f172a; transform: translateY(-1px);}
 
-.inbound-list { display: flex; flex-direction: column; }
+.task-list { display: flex; flex-direction: column; }
 .glass-item {
   padding: 20px 24px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.3);
@@ -452,7 +452,7 @@ const vaiAStorico = () => { router.push('/StoricoMovimenti') }
 .glass-item:hover { background: rgba(255, 255, 255, 0.3); }
 .glass-item:last-child { border-bottom: none; }
 
-.inbound-info { display: flex; flex-direction: column; gap: 6px; }
+.task-info { display: flex; flex-direction: column; gap: 6px; }
 .task-header { display: flex; align-items: center; gap: 10px; }
 .task-id { font-size: 13px; font-weight: 700; color: #64748b; font-family: monospace; }
 .item-desc { margin: 0; font-size: 15px; font-weight: 600; color: #1e293b; }

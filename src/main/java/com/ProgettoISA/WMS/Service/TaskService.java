@@ -24,10 +24,22 @@ public class TaskService {
     private TaskRepository taskRepository;
 
     @Autowired
-    private TaskDipRepository taskDipRepository;
+    private TaskAssignmentService taskAssignmentService;
 
     @Autowired
-    private UtentiRepository utentiRepository;
+    private com.ProgettoISA.WMS.Repository.TaskDipRepository taskDipRepository;
+
+    @Autowired
+    private com.ProgettoISA.WMS.Repository.UtentiRepository utentiRepository;
+
+    @Autowired
+    private com.ProgettoISA.WMS.Repository.BatchProdottiRepository batchProdottiRepository;
+
+    @Autowired
+    private com.ProgettoISA.WMS.Repository.MappaRepository mappaRepository;
+
+    @Autowired
+    private BatchScaffaleService batchScaffaleService;
 
     // IL NOSTRO "POSTINO" WEBSOCKET
     @Autowired
@@ -76,6 +88,67 @@ public class TaskService {
     }
 
     // ==========================================
+    // 1B. CREA MULTIPLI TASK E ASSEGNALI AUTOMATICAMENTE
+    // ==========================================
+    @Transactional
+    public List<TaskDTO> creaEAssegnaMultipli(List<CreaTaskDTO> dtos) {
+        List<Task> nuoviTask = new java.util.ArrayList<>();
+
+        // Crea fisicamente i task
+        for (CreaTaskDTO dto : dtos) {
+            if (dto.getQuantita() <= 0) {
+                throw new IllegalArgumentException("Errore di sicurezza: La quantità deve essere maggiore di zero.");
+            }
+            Task nuovoTask = new Task();
+            nuovoTask.setDescrizione(dto.getDescrizione());
+            nuovoTask.setTipo_task(dto.getTipoTask());
+            nuovoTask.setQta_spostata(dto.getQuantita());
+            nuovoTask.setStato_task("DA_FARE");
+            nuovoTask.setVecchia_x(dto.getVecchiaX());
+            nuovoTask.setVecchia_y(dto.getVecchiaY());
+            nuovoTask.setVecchia_z(dto.getVecchiaZ());
+            nuovoTask.setNuova_x(dto.getNuovaX());
+            nuovoTask.setNuova_y(dto.getNuovaY());
+            nuovoTask.setNuova_z(dto.getNuovaZ());
+            
+            // Collega le entità se fornite
+            if (dto.getIdBatch() != null) {
+                nuovoTask.setBatch_prodotti(batchProdottiRepository.findById(dto.getIdBatch()).orElse(null));
+            }
+            if (dto.getIdScaffaleInizio() != null) {
+                nuovoTask.setScaffale_inizio(mappaRepository.findById(dto.getIdScaffaleInizio()).orElse(null));
+            }
+            if (dto.getIdScaffaleFine() != null) {
+                nuovoTask.setScaffale_fine(mappaRepository.findById(dto.getIdScaffaleFine()).orElse(null));
+            }
+
+            nuoviTask.add(taskRepository.save(nuovoTask));
+        }
+
+        // Assegna automaticamente
+        taskAssignmentService.assegnaTasksAutomaticamente(nuoviTask);
+
+        // Prepariamo i DTO di risposta recuperando le assegnazioni appena fatte
+        List<TaskDTO> responses = new java.util.ArrayList<>();
+        for (Task task : nuoviTask) {
+            TaskDip assegnazione = taskDipRepository.findByTask_Id(task.getId()).orElse(null);
+            if (assegnazione != null) {
+                TaskDTO dto = convertiInDTO(assegnazione);
+                responses.add(dto);
+
+                // 🚀 WEBSOCKET: Invia notifica privata al dipendente scelto
+                if (assegnazione.getDipendente().getEmail() != null) {
+                    String canalePrivato = "/queue/tasks/" + assegnazione.getDipendente().getEmail().trim().toLowerCase();
+                    messagingTemplate.convertAndSend(canalePrivato, dto);
+                }
+                // 🚀 WEBSOCKET: Invia notifica pubblica
+                messagingTemplate.convertAndSend("/topic/tasks", dto);
+            }
+        }
+        return responses;
+    }
+
+    // ==========================================
     // --- HELPER PRIVATO PER MAPPARE I DTO ---
     // ==========================================
     private TaskDTO convertiInDTO(TaskDip td) {
@@ -83,7 +156,7 @@ public class TaskService {
         Utenti dipendente = td.getDipendente();
         String nomeCompleto = dipendente.getNome() + " " + dipendente.getCognome();
 
-        return new TaskDTO(
+        TaskDTO dto = new TaskDTO(
                 t.getId(),
                 t.getDescrizione(),
                 t.getTipo_task(),
@@ -91,6 +164,15 @@ public class TaskService {
                 t.getQta_spostata(),
                 nomeCompleto
         );
+        
+        if (t.getBatch_prodotti() != null) dto.setIdBatch(t.getBatch_prodotti().getId());
+        if (t.getScaffale_inizio() != null) dto.setIdScaffaleInizio(t.getScaffale_inizio().getId());
+        if (t.getScaffale_fine() != null) dto.setIdScaffaleFine(t.getScaffale_fine().getId());
+        dto.setNuovaX(t.getNuova_x());
+        dto.setNuovaY(t.getNuova_y());
+        dto.setNuovaZ(t.getNuova_z());
+        
+        return dto;
     }
 
     // ==========================================
@@ -132,6 +214,51 @@ public class TaskService {
 
         task.setStato_task(nuovoStato);
         Task taskAggiornato = taskRepository.save(task);
+        
+        // --- NOVITÀ: Se il task è completato, aggiorno lo scaffale fisico! ---
+        if ("COMPLETATO".equals(nuovoStato) && taskAggiornato.getBatch_prodotti() != null) {
+            try {
+                // 1. Se era uno spostamento o prelievo da scaffale, rimuovo dalla vecchia cella
+                if (taskAggiornato.getScaffale_inizio() != null && taskAggiornato.getQta_spostata() > 0) {
+                    List<com.ProgettoISA.WMS.DTO.BatchScaffaleDTO> syncRemove = new java.util.ArrayList<>();
+                    // Troviamo l'ID del record BatchScaffale (che possiamo dedurre o lasciare al BatchScaffaleService)
+                    // Purtroppo non abbiamo id del BatchScaffale vecchio.
+                    // Fortunatamente, BatchScaffaleService.sincronizzaBatch con ID null cerca il record se passiamo -qta!
+                    // Ma BatchScaffaleService ha bisogno di QTA POSITIVA e ID.
+                    // Aspetta, BatchScaffaleService: CASO A INSERIMENTO, se trova esistente fa +qta. 
+                    // Se passiamo quantità NEGATIVA e Id nullo?
+                    // "esistente.setQta(esistente.getQta() + dto.getQta());"
+                    // Funzionerebbe! Proviamo ad aggiungere l'operazione di decremento.
+                    syncRemove.add(new com.ProgettoISA.WMS.DTO.BatchScaffaleDTO(
+                            null, 
+                            taskAggiornato.getScaffale_inizio().getId(),
+                            taskAggiornato.getBatch_prodotti().getId(),
+                            taskAggiornato.getVecchia_x(),
+                            taskAggiornato.getVecchia_y(),
+                            taskAggiornato.getVecchia_z(),
+                            -taskAggiornato.getQta_spostata() // Quantità NEGATIVA per rimuovere
+                    ));
+                    batchScaffaleService.sincronizzaBatch(syncRemove);
+                }
+                
+                // 2. Se è un deposito o spostamento, aggiungo alla nuova cella
+                if (taskAggiornato.getScaffale_fine() != null && taskAggiornato.getQta_spostata() > 0) {
+                    List<com.ProgettoISA.WMS.DTO.BatchScaffaleDTO> syncAdd = new java.util.ArrayList<>();
+                    syncAdd.add(new com.ProgettoISA.WMS.DTO.BatchScaffaleDTO(
+                            null, 
+                            taskAggiornato.getScaffale_fine().getId(),
+                            taskAggiornato.getBatch_prodotti().getId(),
+                            taskAggiornato.getNuova_x(),
+                            taskAggiornato.getNuova_y(),
+                            taskAggiornato.getNuova_z(),
+                            taskAggiornato.getQta_spostata()
+                    ));
+                    batchScaffaleService.sincronizzaBatch(syncAdd);
+                }
+            } catch (Exception e) {
+                System.err.println("Errore aggiornamento fisico dello scaffale: " + e.getMessage());
+            }
+        }
 
         // 2. Cerchiamo l'assegnazione in modo efficiente usando il database!
         TaskDip assegnazione = taskDipRepository.findByTask_Id(id).orElse(null);
@@ -148,8 +275,14 @@ public class TaskService {
                     taskAggiornato.getTipo_task(),
                     taskAggiornato.getStato_task(),
                     taskAggiornato.getQta_spostata(),
-                    "Non Assegnato" // <-- Il sesto parametro mancante!
+                    "Non Assegnato"
             );
+            if (taskAggiornato.getBatch_prodotti() != null) responseDto.setIdBatch(taskAggiornato.getBatch_prodotti().getId());
+            if (taskAggiornato.getScaffale_inizio() != null) responseDto.setIdScaffaleInizio(taskAggiornato.getScaffale_inizio().getId());
+            if (taskAggiornato.getScaffale_fine() != null) responseDto.setIdScaffaleFine(taskAggiornato.getScaffale_fine().getId());
+            responseDto.setNuovaX(taskAggiornato.getNuova_x());
+            responseDto.setNuovaY(taskAggiornato.getNuova_y());
+            responseDto.setNuovaZ(taskAggiornato.getNuova_z());
         }
 
         // 🚀 WEBSOCKET: Invia aggiornamento globale

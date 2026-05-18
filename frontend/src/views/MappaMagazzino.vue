@@ -43,6 +43,10 @@ const repartoVisuale = computed(() => {
 const isEditing = ref(false);
 const isSaving = ref(false);
 const isSavingAssignments = ref(false);
+
+const lottiInSistemazione = ref([]);
+const isSidebarOpen = ref(true);
+const activeTab = ref('da_sistemare'); // 'da_sistemare' | 'in_sistemazione'
 const scaffaleSelezionato = ref(null);
 let mappaOriginale = [];
 
@@ -116,6 +120,19 @@ const calcolaSpazioOccupatoCella = (idMappa, altezza, riga, colonna) => {
     const prodotto = getProdottoDaBatch(item.idBatchProdotti);
     spazio += (item.qta * (prodotto ? prodotto.spazioUnitario || 1 : 1));
   });
+
+  const merceInArrivo = taskAttiviDati.value.filter(task => 
+    task.tipoTask === 'DEPOSITO' &&
+    Number(task.idScaffaleFine) === Number(idMappa) &&
+    Number(task.nuovaZ) === Number(altezza) &&
+    Number(task.nuovaY) === Number(riga) &&
+    Number(task.nuovaX) === Number(colonna)
+  );
+  merceInArrivo.forEach(task => {
+    const prodotto = getProdottoDaBatch(task.idBatch);
+    spazio += (task.quantita * (prodotto ? prodotto.spazioUnitario || 1 : 1));
+  });
+
   return Math.round(spazio * 10) / 10;
 };
 
@@ -126,6 +143,13 @@ const calcolaPesoOccupatoScaffale = (idMappa) => {
     const prodotto = getProdottoDaBatch(item.idBatchProdotti);
     peso += (item.qta * (prodotto ? prodotto.pesoUnitario || 0 : 0));
   });
+  
+  const merceInArrivo = taskAttiviDati.value.filter(task => task.tipoTask === 'DEPOSITO' && Number(task.idScaffaleFine) === Number(idMappa));
+  merceInArrivo.forEach(task => {
+    const prodotto = getProdottoDaBatch(task.idBatch);
+    peso += (task.quantita * (prodotto ? prodotto.pesoUnitario || 0 : 0));
+  });
+
   return Math.round(peso * 10) / 10;
 };
 
@@ -258,6 +282,11 @@ const apriModaleDettaglio = (cella, rigaLocale, colonnaLocale, pianoAttuale) => 
     Number(bs.idMappa) === Number(cella.id) && Number(bs.altezza) === Number(pianoAttuale) && 
     Number(bs.riga) === Number(rigaLocale) && Number(bs.colonna) === Number(colonnaLocale)
   );
+  const merceInArrivo = taskAttiviDati.value.filter(task => 
+    task.tipoTask === 'DEPOSITO' &&
+    Number(task.idScaffaleFine) === Number(cella.id) && Number(task.nuovaZ) === Number(pianoAttuale) &&
+    Number(task.nuovaY) === Number(rigaLocale) && Number(task.nuovaX) === Number(colonnaLocale)
+  );
   
   const merceMista = [...merceCellaVecchia, ...merceCellaNuova];
 
@@ -269,10 +298,19 @@ const apriModaleDettaglio = (cella, rigaLocale, colonnaLocale, pianoAttuale) => 
       return {
         ...item, 
         refOriginale: item, 
-        batch: batchInfo, // Aggiunto per poter recuperare la data di scadenza
+        batch: batchInfo, 
         prodotto: getProdottoDaBatch(item.idBatchProdotti),
         isNuovo: merceCellaNuova.includes(item),
         qtaRimuovere: 1 
+      };
+    }),
+    inArrivo: merceInArrivo.map(task => {
+      const batchInfo = tuttiIBatch.value.find(b => Number(b.id) === Number(task.idBatch));
+      return {
+        taskId: task.id,
+        qta: task.quantita,
+        batch: batchInfo,
+        prodotto: getProdottoDaBatch(task.idBatch)
       };
     })
   };
@@ -405,9 +443,51 @@ const salvaAssegnamenti = async () => {
   if (nuoviAssegnamenti.value.length === 0 && modifichePendenti.value.length === 0) return;
   isSavingAssignments.value = true;
   try {
-    const payloadSingolo = [...nuoviAssegnamenti.value, ...modifichePendenti.value];
-    await api.post('/api/batch-scaffale/salva', payloadSingolo);
-    alert("Dati salvati e sincronizzati con successo!");
+    const tasksDaCreare = [];
+    
+    // Per i nuovi assegnamenti (ingresso)
+    for (const na of nuoviAssegnamenti.value) {
+      const lotto = tuttiIBatch.value.find(b => Number(b.id) === Number(na.idBatchProdotti));
+      const prodotto = getProdottoDaBatch(na.idBatchProdotti);
+      tasksDaCreare.push({
+        descrizione: `Sistemazione in ingresso: ${prodotto?.nome || 'Prodotto'} (Lotto #${lotto?.id})`,
+        tipoTask: 'DEPOSITO',
+        quantita: na.qta,
+        idBatch: na.idBatchProdotti,
+        idScaffaleFine: na.idMappa,
+        nuovaX: na.colonna, 
+        nuovaY: na.riga,
+        nuovaZ: na.altezza
+      });
+    }
+    
+    for (const mp of modifichePendenti.value) {
+      const original = batchScaffaliDati.value.find(bs => Number(bs.id) === Number(mp.id));
+      if (!original) continue;
+      const differenza = original.qta - mp.qta;
+      if (differenza > 0) {
+        // Rimozione dallo scaffale
+        const prodotto = getProdottoDaBatch(mp.idBatchProdotti);
+        tasksDaCreare.push({
+          descrizione: `Prelievo da scaffale: ${prodotto?.nome || 'Prodotto'} (Lotto #${mp.idBatchProdotti})`,
+          tipoTask: 'PRELIEVO',
+          quantita: differenza,
+          idBatch: mp.idBatchProdotti,
+          idScaffaleInizio: mp.idMappa,
+          vecchiaX: mp.colonna, 
+          vecchiaY: mp.riga,
+          vecchiaZ: mp.altezza
+        });
+      }
+    }
+    
+    if (tasksDaCreare.length > 0) {
+        await api.post('/api/tasks/crea-e-assegna-multipli', tasksDaCreare);
+        alert("Task generati e assegnati agli operatori con successo!");
+    } else {
+        alert("Nessuna modifica rilevante per generare task.");
+    }
+    
     window.location.reload(); 
   } catch (error) { 
     console.error("Errore salvataggio API:", error);
@@ -430,6 +510,30 @@ const selezionaLotto = (lotto) => {
   }
 };
 
+const lottiDaSistemareFiltrati = computed(() => {
+  if (!repartoVisuale.value) return lottiSospesi.value;
+  return lottiSospesi.value.filter(lotto => isProdottoCompatibileConReparto(lotto.idProdotto, repartoVisuale.value));
+});
+
+const lottiInSistemazioneFiltrati = computed(() => {
+  if (!repartoVisuale.value) return lottiInSistemazione.value;
+  return lottiInSistemazione.value.filter(lotto => isProdottoCompatibileConReparto(lotto.idProdotto, repartoVisuale.value));
+});
+
+const isProdottoCompatibileConReparto = (idProdotto, reparto) => {
+  const etichette = getEtichetteProdotto(idProdotto);
+  const repNome = (reparto.nome || "").toLowerCase();
+  
+  const isFresco = etichette.some(e => e.nome.toLowerCase().includes('fresc'));
+  const isSurgelato = etichette.some(e => e.nome.toLowerCase().includes('surgelat'));
+  
+  if (repNome.includes('fresc')) return isFresco;
+  if (repNome.includes('surgelat')) return isSurgelato;
+  
+  // Se il reparto è secco (non fresco e non surgelato), o altro
+  return !isFresco && !isSurgelato;
+};
+
 const getSlotStatus = (cella, slotIndex) => {
   const pianoAttuale = getPiano(cella.id);
   const info = getDatiTecniciScaffale(cella.idScaffale);
@@ -441,15 +545,30 @@ const getSlotStatus = (cella, slotIndex) => {
     Number(bs.idMappa) === Number(cella.id) && Number(bs.altezza) === Number(pianoAttuale) && 
     Number(bs.riga) === Number(rigaLocale) && Number(bs.colonna) === Number(colonnaLocale) && Number(bs.qta) > 0
   );
+  
+  const hasInArrivo = taskAttiviDati.value.some(task => 
+    Number(task.idScaffaleFine) === Number(cella.id) && Number(task.nuovaZ) === Number(pianoAttuale) &&
+    Number(task.nuovaY) === Number(rigaLocale) && Number(task.nuovaX) === Number(colonnaLocale)
+  );
+
+  const hasInUscita = taskAttiviDati.value.some(task => 
+    Number(task.idScaffaleInizio) === Number(cella.id) && Number(task.vecchiaZ) === Number(pianoAttuale) &&
+    Number(task.vecchiaY) === Number(rigaLocale) && Number(task.vecchiaX) === Number(colonnaLocale)
+  );
+  
   const hasSalvati = batchScaffaliDati.value.some(bs => 
     Number(bs.idMappa) === Number(cella.id) && Number(bs.altezza) === Number(pianoAttuale) && 
     Number(bs.riga) === Number(rigaLocale) && Number(bs.colonna) === Number(colonnaLocale) && Number(bs.qta) > 0
   );
 
-  if (hasNuovi) return 'nuovo'; 
-  if (hasSalvati) return 'salvato';
-  return 'vuoto';
+  if (hasNuovi) return 'slot-nuovo'; 
+  if (hasInArrivo) return 'slot-inarrivo';
+  if (hasInUscita) return 'slot-inuscita';
+  if (hasSalvati) return 'slot-salvato';
+  return 'slot-vuoto';
 };
+
+const taskAttiviDati = ref([]);
 
 const scaffaleInfoAttivo = ref(null);
 const apriInfoScaffale = (cella) => { scaffaleInfoAttivo.value = cella; };
@@ -544,21 +663,34 @@ onMounted(async () => {
       batchScaffaliDati.value = scaffaliBackend;
     } catch (e) { console.error("Errore API Batch Scaffali:", e); }
 
+    try {
+      const resTaskAttivi = await api.get('/api/tasks/attivi');
+      taskAttiviDati.value = resTaskAttivi.data;
+    } catch(e) { console.error("Errore Tasks:", e); }
+
     if (lottiBackend.length > 0) {
       const lottiCalcolati = lottiBackend.map(lotto => {
         const qtaGiaAssegnata = scaffaliBackend
           .filter(bs => Number(bs.idBatchProdotti) === Number(lotto.id))
           .reduce((sum, item) => sum + item.qta, 0);
+          
+        const qtaInArrivoDaTasks = taskAttiviDati.value
+          .filter(t => Number(t.idBatch) === Number(lotto.id) && t.tipoTask === 'DEPOSITO')
+          .reduce((sum, item) => sum + item.quantita, 0);
+
+        const qtaAssegnataTotale = qtaGiaAssegnata + qtaInArrivoDaTasks;
 
         return {
           ...lotto,
           quantitaTotale: lotto.quantita, 
-          quantita: lotto.quantita - qtaGiaAssegnata 
+          quantita: lotto.quantita - qtaAssegnataTotale,
+          qtaInSistemazione: qtaInArrivoDaTasks
         };
       });
 
       tuttiIBatch.value = lottiCalcolati;
       lottiSospesi.value = lottiCalcolati.filter(l => l.quantita > 0);
+      lottiInSistemazione.value = lottiCalcolati.filter(l => l.qtaInSistemazione > 0);
     }
 
   } catch (e) {
@@ -640,7 +772,7 @@ onMounted(async () => {
                       class="slot-1x1"
                       :class="{
                         'cursor-assegna': lottoDaAssegnare && !isEditing, 
-                        'cursor-info': !lottoDaAssegnare && !isEditing && getSlotStatus(cella, slotIndex) !== 'vuoto',
+                        'cursor-info': !lottoDaAssegnare && !isEditing && getSlotStatus(cella, slotIndex) !== 'slot-vuoto',
                         'is-suggested': isCellaSuggerita(
                           cella.id, 
                           getPiano(cella.id), 
@@ -650,7 +782,7 @@ onMounted(async () => {
                       }"
                       @click.stop="gestisciClickCella(cella, slotIndex)"
                     >
-                      <div v-if="haPiano(cella) && getSlotStatus(cella, slotIndex) !== 'vuoto'" class="batch-placeholder" :class="getSlotStatus(cella, slotIndex)">
+                      <div v-if="haPiano(cella) && getSlotStatus(cella, slotIndex) !== 'slot-vuoto'" class="batch-placeholder" :class="getSlotStatus(cella, slotIndex)">
                          <span class="spazio-indicatore">{{ calcolaSpazioOccupatoCella(cella.id, getPiano(cella.id), Math.floor((slotIndex-1) / (cella.orientamentoScaffale === 'ORIZZONTALE' ? getDatiTecniciScaffale(cella.idScaffale).max_righe : getDatiTecniciScaffale(cella.idScaffale).max_colonne)), ((slotIndex-1) % (cella.orientamentoScaffale === 'ORIZZONTALE' ? getDatiTecniciScaffale(cella.idScaffale).max_righe : getDatiTecniciScaffale(cella.idScaffale).max_colonne))) }}/{{ MAX_SPAZIO_CELLA }}</span>
                       </div>
                     </div>
@@ -664,63 +796,92 @@ onMounted(async () => {
       </main>
     </div>
 
-    <div v-if="!isEditing" class="floating-assignment-panel">
-      <div class="panel-header">
-        <h3>Merce da Assegnare</h3>
-        <span class="badge">{{ lottiSospesi.length }}</span>
-      </div>
-      <div class="batch-list">
-        <div v-for="lotto in lottiSospesi" :key="lotto.id" class="batch-card" :class="{'selected': lottoDaAssegnare?.id === lotto.id}" @click="selezionaLotto(lotto)">
-          
-          <div class="batch-info">
-            <div class="flex justify-between items-start">
-              <strong>Lotto #{{ lotto.id }}</strong>
-              <span class="badge bg-blue-100 text-blue-800 font-bold">Disp: {{ lotto.quantita }} pz</span>
-            </div>
-            
-            <span class="text-blue font-bold text-lg mt-1 block">{{ getNomeProdotto(lotto.idProdotto) }}</span>
-            
-            <div class="dettagli-tecnici mt-2">
-              <div class="dettaglio-item" v-if="lotto.scadenza || lotto.dataScadenza">
-                <svg class="icon-tiny" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                Scadenza: {{ formatData(lotto.scadenza || lotto.dataScadenza) }}
-              </div>
-              <div class="dettaglio-item">
-                <svg class="icon-tiny" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"></path></svg>
-                Peso Un.: {{ getProdottoDaBatch(lotto.id)?.pesoUnitario }} kg
-              </div>
-              <div class="dettaglio-item">
-                <svg class="icon-tiny" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
-                Spazio Un.: {{ getProdottoDaBatch(lotto.id)?.spazioUnitario }}/{{ MAX_SPAZIO_CELLA }}
-              </div>
-            </div>
+    <div v-if="!isEditing" class="floating-sidebar" :class="{'sidebar-open': isSidebarOpen}">
+      <button class="sidebar-toggle" @click="isSidebarOpen = !isSidebarOpen">
+        <svg v-if="isSidebarOpen" class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+        <svg v-else class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+      </button>
 
-            <div class="etichette-container mt-2" v-if="getEtichetteProdotto(lotto.idProdotto).length > 0">
-              <span v-for="et in getEtichetteProdotto(lotto.idProdotto)" :key="et.id" class="etichetta-pill">
-                {{ et.nome }}
-              </span>
-            </div>
-          </div>
-
-          <div v-if="lottoDaAssegnare?.id === lotto.id" class="assegnazione-controls" @click.stop>
-            <div class="flex justify-between items-center mb-2 mt-2">
-              <label>Qta da piazzare:</label>
-              <button @click.stop="suggerisciPosizione(lotto)" class="btn-suggerisci">
-                💡 Suggerisci
-              </button>
-            </div>
-            <input type="number" v-model.number="quantitaSelezionata" min="1" :max="lotto.quantita" />
-            <p class="help-text">Clicca su uno slot blu per inserire.</p>
+      <div class="sidebar-content">
+        <div class="panel-header">
+          <h3>Gestione Merci</h3>
+          <div class="tabs-container">
+            <button class="tab-btn" :class="{'active': activeTab === 'da_sistemare'}" @click="activeTab = 'da_sistemare'">
+              Da Sistemare <span class="badge badge-tab">{{ lottiDaSistemareFiltrati.length }}</span>
+            </button>
+            <button class="tab-btn" :class="{'active': activeTab === 'in_sistemazione'}" @click="activeTab = 'in_sistemazione'">
+              In Sistemazione <span class="badge badge-tab badge-yellow">{{ lottiInSistemazioneFiltrati.length }}</span>
+            </button>
           </div>
         </div>
-        <div v-if="lottiSospesi.length === 0" class="empty-list">Nessun lotto in attesa.</div>
-      </div>
 
-      <div class="panel-footer" v-if="nuoviAssegnamenti.length > 0 || modifichePendenti.length > 0">
-        <div class="unsaved-count"><span>Modifiche in sospeso!</span></div>
-        <div class="action-buttons">
-          <button @click="salvaAssegnamenti" class="btn-save-batch" :disabled="isSavingAssignments">{{ isSavingAssignments ? 'Salvataggio...' : 'Conferma Tutto' }}</button>
-          <button @click="annullaAssegnamenti" class="btn-cancel-batch" :disabled="isSavingAssignments">Annulla</button>
+        <div class="batch-list" v-if="activeTab === 'da_sistemare'">
+          <div v-for="lotto in lottiDaSistemareFiltrati" :key="lotto.id" class="batch-card" :class="{'selected': lottoDaAssegnare?.id === lotto.id}" @click="selezionaLotto(lotto)">
+            <div class="batch-info">
+              <div class="flex justify-between items-start">
+                <strong>Lotto #{{ lotto.id }}</strong>
+                <span class="badge bg-blue-100 text-blue-800 font-bold">Disp: {{ lotto.quantita }} pz</span>
+              </div>
+              
+              <span class="text-blue font-bold text-lg mt-1 block">{{ getNomeProdotto(lotto.idProdotto) }}</span>
+              
+              <div class="dettagli-tecnici mt-2">
+                <div class="dettaglio-item" v-if="lotto.scadenza || lotto.dataScadenza">
+                  <svg class="icon-tiny" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                  Scadenza: {{ formatData(lotto.scadenza || lotto.dataScadenza) }}
+                </div>
+                <div class="dettaglio-item">
+                  <svg class="icon-tiny" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"></path></svg>
+                  Peso Un.: {{ getProdottoDaBatch(lotto.id)?.pesoUnitario }} kg
+                </div>
+                <div class="dettaglio-item">
+                  <svg class="icon-tiny" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
+                  Spazio Un.: {{ getProdottoDaBatch(lotto.id)?.spazioUnitario }}/{{ MAX_SPAZIO_CELLA }}
+                </div>
+              </div>
+
+              <div class="etichette-container mt-2" v-if="getEtichetteProdotto(lotto.idProdotto).length > 0">
+                <span v-for="et in getEtichetteProdotto(lotto.idProdotto)" :key="et.id" class="etichetta-pill">
+                  {{ et.nome }}
+                </span>
+              </div>
+            </div>
+
+            <div v-if="lottoDaAssegnare?.id === lotto.id" class="assegnazione-controls" @click.stop>
+              <div class="flex justify-between items-center mb-2 mt-2">
+                <label>Qta da piazzare:</label>
+                <button @click.stop="suggerisciPosizione(lotto)" class="btn-suggerisci">
+                  💡 Suggerisci
+                </button>
+              </div>
+              <input type="number" v-model.number="quantitaSelezionata" min="1" :max="lotto.quantita" />
+              <p class="help-text">Clicca su uno slot blu per inserire.</p>
+            </div>
+          </div>
+          <div v-if="lottiDaSistemareFiltrati.length === 0" class="empty-list">Nessun lotto in attesa per questo reparto.</div>
+        </div>
+
+        <div class="batch-list" v-else-if="activeTab === 'in_sistemazione'">
+          <div v-for="lotto in lottiInSistemazioneFiltrati" :key="'insys-'+lotto.id" class="batch-card in-lavorazione">
+            <div class="batch-info">
+              <div class="flex justify-between items-start">
+                <strong>Lotto #{{ lotto.id }}</strong>
+                <span class="badge bg-yellow-100 text-yellow-800 font-bold">In volo: {{ lotto.qtaInSistemazione }} pz</span>
+              </div>
+              
+              <span class="text-gray-600 font-bold text-lg mt-1 block">{{ getNomeProdotto(lotto.idProdotto) }}</span>
+              <p class="text-sm text-gray-500 mt-2">Questa merce è stata assegnata a uno o più task ed è attualmente in lavorazione da parte di un operatore.</p>
+            </div>
+          </div>
+          <div v-if="lottiInSistemazioneFiltrati.length === 0" class="empty-list">Nessun task in corso per questo reparto.</div>
+        </div>
+
+        <div class="panel-footer" v-if="nuoviAssegnamenti.length > 0 || modifichePendenti.length > 0">
+          <div class="unsaved-count"><span>Modifiche in sospeso!</span></div>
+          <div class="action-buttons">
+            <button @click="salvaAssegnamenti" class="btn-save-batch" :disabled="isSavingAssignments">{{ isSavingAssignments ? 'Salvataggio...' : 'Conferma Tutto' }}</button>
+            <button @click="annullaAssegnamenti" class="btn-cancel-batch" :disabled="isSavingAssignments">Annulla</button>
+          </div>
         </div>
       </div>
     </div>
@@ -789,7 +950,25 @@ onMounted(async () => {
               
             </div>
           </div>
-          <div v-if="cellaDettaglioAttiva.elementi.length === 0" class="text-center text-gray-500 py-4">Slot vuoto.</div>
+          
+          <div v-if="cellaDettaglioAttiva.inArrivo.length > 0" class="mt-4 border-t pt-4 border-gray-200">
+            <h4 class="text-sm font-bold text-gray-700 uppercase tracking-wide mb-2 flex items-center gap-2">
+              <span class="inline-block w-2 h-2 rounded-full bg-yellow-400"></span>
+              Prodotti da sistemare (Task Attivi)
+            </h4>
+            <div v-for="item in cellaDettaglioAttiva.inArrivo" :key="'arr-'+item.taskId" class="item-dettaglio-card border-yellow-200 bg-yellow-50 mb-3">
+              <div class="flex justify-between items-start mb-1">
+                <span class="badge badge-yellow">Arrivo: {{ item.qta }} pz</span>
+                <span class="text-xs text-gray-500">Task #{{ item.taskId }}</span>
+              </div>
+              <span class="text-yellow-800 font-bold text-lg block">{{ item.prodotto ? item.prodotto.nome : 'Sconosciuto' }}</span>
+              <div class="text-sm text-yellow-700 mt-1">
+                In attesa che l'operatore completi il piazzamento per il Lotto #{{ item.batch?.id }}.
+              </div>
+            </div>
+          </div>
+          
+          <div v-if="cellaDettaglioAttiva.elementi.length === 0 && cellaDettaglioAttiva.inArrivo.length === 0" class="text-center text-gray-500 py-4">Slot vuoto.</div>
         </div>
       </div>
     </div>
@@ -842,6 +1021,12 @@ onMounted(async () => {
 .view-controls, .edit-controls { display: flex; align-items: center; gap: 15px; }
 .edit-status { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: #1e40af; font-weight: 600; background: #eff6ff; padding: 8px 16px; border-radius: 6px; border: 1px solid #bfdbfe;}
 .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 9999; display: flex; align-items: center; justify-content: center; }
+/* Slots e Elementi Interni */
+.slot-cella { width: 100%; height: 100%; border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 2px; position: relative; background-color: #f1f5f9; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #64748b; }
+.slot-salvato { background-color: #3b82f6; border-color: #2563eb; }
+.slot-nuovo { background-color: #10b981; border-color: #059669; animation: pulse 1.5s infinite; }
+.slot-inarrivo { background-color: #eab308; border-color: #ca8a04; opacity: 0.8; }
+.slot-inuscita { background-color: #ef4444; border-color: #b91c1c; opacity: 0.8; }
 .modal-content { background: white; border-radius: 12px; width: 420px; max-width: 90%; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); overflow: hidden; border: 1px solid #cbd5e1;}
 .modal-content-large { background: white; border-radius: 12px; width: 500px; max-width: 95%; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); overflow: hidden; border: 1px solid #cbd5e1;}
 .modal-header { background: #f8fafc; padding: 15px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
@@ -903,11 +1088,23 @@ onMounted(async () => {
 .slot-1x1.cursor-assegna:hover { background-color: rgba(16, 185, 129, 0.2); border-color: #10b981; }
 .slot-1x1.cursor-info:hover { background-color: rgba(59, 130, 246, 0.2); }
 
-.floating-assignment-panel { position: absolute; top: 90px; right: 30px; width: 320px; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border: 1px solid #cbd5e1; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); z-index: 100; display: flex; flex-direction: column; max-height: calc(100vh - 120px); overflow: hidden; }
-.panel-header { background: #f8fafc; padding: 12px 16px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
-.panel-header h3 { margin: 0; font-size: 1rem; color: #0f172a; }
-.panel-header .badge { background: #3b82f6; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: bold;}
-.batch-list { padding: 10px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; flex: 1;}
+.floating-sidebar { position: fixed; top: 0; right: -380px; width: 380px; height: 100vh; background: white; box-shadow: -4px 0 15px rgba(0,0,0,0.05); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 50; display: flex; flex-direction: column; border-left: 1px solid #e2e8f0; }
+.floating-sidebar.sidebar-open { transform: translateX(-380px); }
+.sidebar-toggle { position: absolute; left: -40px; top: 50%; transform: translateY(-50%); width: 40px; height: 80px; background: white; border: 1px solid #e2e8f0; border-right: none; border-radius: 8px 0 0 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #64748b; box-shadow: -4px 0 8px rgba(0,0,0,0.02); }
+.sidebar-toggle:hover { color: #3b82f6; background: #f8fafc; }
+.sidebar-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+.tabs-container { display: flex; border-bottom: 1px solid #e2e8f0; margin-top: 10px; background: #f8fafc; border-radius: 6px; padding: 4px; gap: 4px;}
+.tab-btn { flex: 1; padding: 8px; border: none; background: transparent; cursor: pointer; font-size: 0.85rem; font-weight: 600; color: #64748b; border-radius: 4px; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px;}
+.tab-btn:hover { color: #1e293b; background: #e2e8f0; }
+.tab-btn.active { color: #3b82f6; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+.badge-tab { padding: 2px 6px; font-size: 0.7rem; }
+.badge-yellow { background: #fef08a; color: #854d0e; }
+.in-lavorazione { border-left-color: #eab308 !important; opacity: 0.9;}
+
+.panel-header { padding: 15px 20px; border-bottom: 1px solid #e2e8f0; }
+.panel-header h3 { margin: 0; font-size: 1.1rem; color: #1e293b; }
+.batch-list { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 8px; }
 .batch-card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; cursor: pointer; transition: 0.2s; background: white; }
 .batch-card:hover { border-color: #94a3b8; }
 .batch-card.selected { border-color: #10b981; box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2); background: #f0fdf4; }
@@ -943,9 +1140,11 @@ onMounted(async () => {
 .lotto-modal-item { background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; }
 .badge { padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; }
 .bg-yellow-100 { background-color: #fef3c7; } .text-yellow-800 { color: #92400e; }
+.bg-yellow-50 { background-color: #fefce8; } .border-yellow-200 { border: 1px solid #fef08a; } .text-yellow-700 { color: #a16207; }
 .bg-blue-100 { background-color: #dbeafe; } .text-blue-800 { color: #1e40af; }
 .border-yellow-500 { border-left-color: #eab308; } .border-blue-500 { border-left-color: #3b82f6; }
 .text-red-500 { color: #ef4444; }
+.item-dettaglio-card { padding: 12px; border-radius: 6px; }
 
 .removal-controls { background: #fff; padding: 8px; border-radius: 4px; border: 1px dashed #cbd5e1; display: flex; align-items: center; justify-content: space-between;}
 .removal-controls label { font-size: 0.8rem; font-weight: bold; color: #475569;}

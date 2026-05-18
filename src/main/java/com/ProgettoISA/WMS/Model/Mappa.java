@@ -1,5 +1,6 @@
 package com.ProgettoISA.WMS.Model;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import jakarta.persistence.Column;
@@ -39,7 +40,13 @@ public class Mappa {
     private String orientamentoScaffale;
 
     @OneToMany(mappedBy = "mappa")
-    private List<BatchScaffale> listabatch;
+    private List<BatchScaffale> listabatch = new ArrayList<>();
+
+    @OneToMany(mappedBy = "scaffale_inizio")
+    private List<Task> task_scaffali_inizio = new ArrayList<>();
+
+    @OneToMany(mappedBy = "scaffale_fine")
+    private List<Task> task_scaffali_fine = new ArrayList<>();
 
     public Mappa() {
     }
@@ -100,4 +107,11 @@ public class Mappa {
         this.orientamentoScaffale = orientamentoScaffale;
     }
 
+    public List<Task> getTask_scaffali_inizio() {
+        return task_scaffali_inizio;
+    }
+
+    public List<Task> getTask_scaffali_fine() {
+        return task_scaffali_fine;
+    }
 }
