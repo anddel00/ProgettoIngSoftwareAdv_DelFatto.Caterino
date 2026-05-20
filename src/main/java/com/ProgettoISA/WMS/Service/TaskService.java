@@ -45,7 +45,7 @@ public class TaskService {
     @Autowired
     private SimpMessageSendingOperations messagingTemplate;
     // ==========================================
-    // 1. CREA UN TASK E ASSEGNALO A UN DIPENDENTE
+    // 1. CREA UN TASK E ASSEGNALO A UN DIPENDENTE // questo qui è quello manuale, lo lascio perché è ancora possibile assegnare un task manualmente (il frontend non è stato toccato)
     // ==========================================
     @Transactional
     public TaskDTO creaEAssegna(CreaTaskDTO dto) {
@@ -168,9 +168,20 @@ public class TaskService {
         if (t.getBatch_prodotti() != null) dto.setIdBatch(t.getBatch_prodotti().getId());
         if (t.getScaffale_inizio() != null) dto.setIdScaffaleInizio(t.getScaffale_inizio().getId());
         if (t.getScaffale_fine() != null) dto.setIdScaffaleFine(t.getScaffale_fine().getId());
+
+        // Reparto: preferisce scaffale_inizio, fallback su scaffale_fine
+        if (t.getScaffale_inizio() != null && t.getScaffale_inizio().getReparto() != null) {
+            dto.setNomeReparto(t.getScaffale_inizio().getReparto().getNome());
+        } else if (t.getScaffale_fine() != null && t.getScaffale_fine().getReparto() != null) {
+            dto.setNomeReparto(t.getScaffale_fine().getReparto().getNome());
+        }
+
         dto.setNuovaX(t.getNuova_x());
         dto.setNuovaY(t.getNuova_y());
         dto.setNuovaZ(t.getNuova_z());
+        dto.setVecchiaX(t.getVecchia_x());
+        dto.setVecchiaY(t.getVecchia_y());
+        dto.setVecchiaZ(t.getVecchia_z());
         
         return dto;
     }
@@ -206,7 +217,7 @@ public class TaskService {
     // ==========================================
     // 4. AGGIORNA LO STATO DI UN TASK
     // ==========================================
-    @Transactional
+    @Transactional // è transactional perché se la collocazione fisica dovesse fallire (es. c'è meno merce di quella che si vuole sottrarre), il database applica il rollback e fa tornare il task in stato "da fare".
     public TaskDTO aggiornaStato(Long id, String nuovoStato) {
         // 1. Aggiorniamo il task fisico
         Task task = taskRepository.findById(id)
@@ -221,14 +232,8 @@ public class TaskService {
                 // 1. Se era uno spostamento o prelievo da scaffale, rimuovo dalla vecchia cella
                 if (taskAggiornato.getScaffale_inizio() != null && taskAggiornato.getQta_spostata() > 0) {
                     List<com.ProgettoISA.WMS.DTO.BatchScaffaleDTO> syncRemove = new java.util.ArrayList<>();
-                    // Troviamo l'ID del record BatchScaffale (che possiamo dedurre o lasciare al BatchScaffaleService)
-                    // Purtroppo non abbiamo id del BatchScaffale vecchio.
-                    // Fortunatamente, BatchScaffaleService.sincronizzaBatch con ID null cerca il record se passiamo -qta!
-                    // Ma BatchScaffaleService ha bisogno di QTA POSITIVA e ID.
-                    // Aspetta, BatchScaffaleService: CASO A INSERIMENTO, se trova esistente fa +qta. 
-                    // Se passiamo quantità NEGATIVA e Id nullo?
-                    // "esistente.setQta(esistente.getQta() + dto.getQta());"
-                    // Funzionerebbe! Proviamo ad aggiungere l'operazione di decremento.
+                    //se c'era uno "scaffale_inizio", significa che stiamo togliendo merce. Il sistema crea un BatchScaffale DTO con quantità negativa
+                    //creo quindi un BatchScaffaleDTO con quantità spostata negativa. Se questo viene passato al BatchScaffaleService, questo andrà a trovare i pacchi e sottrarrà la quantità (se arriva a zero, si svuota)
                     syncRemove.add(new com.ProgettoISA.WMS.DTO.BatchScaffaleDTO(
                             null, 
                             taskAggiornato.getScaffale_inizio().getId(),
@@ -242,6 +247,7 @@ public class TaskService {
                 }
                 
                 // 2. Se è un deposito o spostamento, aggiungo alla nuova cella
+                //se invece c'è uno scaffale_fine, crea un DTO con quantità positiva -> lo invia al batchScaffaleService, il quale piazzerà fisicamente il lotto nello scaffale (mappa) corrispondente.
                 if (taskAggiornato.getScaffale_fine() != null && taskAggiornato.getQta_spostata() > 0) {
                     List<com.ProgettoISA.WMS.DTO.BatchScaffaleDTO> syncAdd = new java.util.ArrayList<>();
                     syncAdd.add(new com.ProgettoISA.WMS.DTO.BatchScaffaleDTO(
@@ -295,5 +301,40 @@ public class TaskService {
         }
 
         return responseDto;
+    }
+
+    // ==========================================
+    // 5. ANNULLA TASK (CANCELLAZIONE FISICA)
+    // ==========================================
+    @Transactional
+    public void annullaTask(Long taskId) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new IllegalArgumentException("Task non trovato."));
+
+        if ("COMPLETATO".equals(task.getStato_task())) {
+            throw new IllegalArgumentException("Impossibile annullare un task già completato.");
+        }
+
+        // Cerca assegnazione per notificare ed eliminare
+        TaskDip assegnazione = taskDipRepository.findByTask_Id(taskId).orElse(null);
+        String dipendenteEmail = null;
+        if (assegnazione != null) {
+            if (assegnazione.getDipendente() != null) {
+                dipendenteEmail = assegnazione.getDipendente().getEmail();
+            }
+            taskDipRepository.delete(assegnazione);
+        }
+
+        // Elimina fisicamente il task
+        taskRepository.delete(task);
+
+        // Notifica WebSocket per il frontend e il palmarino
+        TaskDTO taskAnnullatoDto = new TaskDTO(taskId, "Task Annullato", "ANNULLATO", "ANNULLATO", 0);
+        
+        if (dipendenteEmail != null) {
+            String canalePrivato = "/queue/tasks/" + dipendenteEmail.trim().toLowerCase();
+            messagingTemplate.convertAndSend(canalePrivato, taskAnnullatoDto);
+        }
+        messagingTemplate.convertAndSend("/topic/tasks", taskAnnullatoDto);
     }
 }

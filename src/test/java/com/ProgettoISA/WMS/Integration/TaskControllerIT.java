@@ -20,9 +20,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.security.test.context.support.WithMockUser;
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@WithMockUser(roles = "Admin")
 @Transactional // Fondamentale: fa il "rollback" (cancella) del DB alla fine di ogni test per non sporcarlo
 @ActiveProfiles("test") // IMPORTANTE PER TUTTI I TEST DI INTEGRAZIONE!!!!!!
 public class TaskControllerIT {

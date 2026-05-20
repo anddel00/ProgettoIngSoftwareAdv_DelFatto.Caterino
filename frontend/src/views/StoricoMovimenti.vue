@@ -64,6 +64,21 @@ const storicoFiltrato = computed(() => {
 onMounted(() => {
   fetchStorico()
 })
+
+// Helper: label leggibile di uno slot
+const labelScaffale = (idScaffale, y, x, z) => {
+  if (!idScaffale) return null
+  return `S${idScaffale} · R${y + 1} C${x + 1} P${z + 1}`
+}
+
+const getPercorso = (record) => {
+  const inizio = labelScaffale(record.idScaffaleInizio, record.vecchiaY, record.vecchiaX, record.vecchiaZ)
+  const fine   = labelScaffale(record.idScaffaleFine,   record.nuovaY,  record.nuovaX,  record.nuovaZ)
+  if (record.tipoTask === 'SPOSTAMENTO') return { da: inizio || '—', a: fine || '—', tipo: 'sposta' }
+  if (record.tipoTask === 'PRELIEVO')    return { da: inizio || '—', a: 'In attesa', tipo: 'preleva' }
+  if (record.tipoTask === 'DEPOSITO')    return { da: 'In attesa', a: fine || '—',   tipo: 'deposita' }
+  return { da: '—', a: '—', tipo: '' }
+}
 </script>
 
 <template>
@@ -128,8 +143,9 @@ onMounted(() => {
               <tr>
                 <th>ID Task</th>
                 <th>Operatore</th>
-                <th>Tipo Operazione</th>
-                <th>Articolo / Descrizione</th>
+                <th>Tipo</th>
+                <th>Percorso</th>
+                <th>Reparto</th>
                 <th>Qta</th>
                 <th>Stato</th>
               </tr>
@@ -146,7 +162,19 @@ onMounted(() => {
                       {{ record.tipoTask }}
                     </span>
                 </td>
-                <td class="desc-cell">{{ record.descrizione }}</td>
+                <!-- COLONNA PERCORSO -->
+                <td class="route-cell">
+                  <div class="route-wrap" :class="'route-' + getPercorso(record).tipo">
+                    <span class="route-slot">{{ getPercorso(record).da }}</span>
+                    <svg class="route-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+                    <span class="route-slot" :class="{'route-attesa': getPercorso(record).a === 'In attesa' || getPercorso(record).da === 'In attesa'}">{{ getPercorso(record).a }}</span>
+                  </div>
+                </td>
+                <!-- COLONNA REPARTO -->
+                <td>
+                  <span v-if="record.nomeReparto" class="reparto-badge">{{ record.nomeReparto }}</span>
+                  <span v-else class="text-muted">&mdash;</span>
+                </td>
                 <td><strong>{{ record.quantita || record.qtaSpostata }}</strong></td>
                 <td><span class="glass-badge badge-success">Completato</span></td>
               </tr>
@@ -253,4 +281,18 @@ onMounted(() => {
 .empty-state-glass { padding: 60px 0; color: #64748b; text-align: center; display: flex; flex-direction: column; align-items: center; }
 .empty-state-glass svg { width: 48px; height: 48px; margin-bottom: 16px; opacity: 0.5; }
 .empty-state-glass p { margin: 0; font-size: 15px; }
+
+/* --- COLONNA PERCORSO --- */
+.route-cell { min-width: 220px; }
+.route-wrap { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 5px 8px; border-radius: 8px; width: fit-content; }
+.route-sposta  { background: rgba(139,92,246,0.08); border: 1px solid rgba(139,92,246,0.15); }
+.route-preleva { background: rgba(239,68,68,0.07);  border: 1px solid rgba(239,68,68,0.15); }
+.route-deposita{ background: rgba(16,185,129,0.07); border: 1px solid rgba(16,185,129,0.15); }
+.route-slot { font-family: 'Courier New', monospace; font-size: 11px; color: #334155; padding: 2px 6px; background: rgba(255,255,255,0.7); border-radius: 4px; white-space: nowrap; }
+.route-attesa { color: #94a3b8 !important; background: #f8fafc !important; font-style: italic; }
+.route-arrow { width: 12px; height: 12px; color: #94a3b8; flex-shrink: 0; }
+
+/* --- BADGE REPARTO --- */
+.reparto-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; background: rgba(99,102,241,0.1); color: #4338ca; border: 1px solid rgba(99,102,241,0.2); white-space: nowrap; }
+.text-muted { color: #94a3b8; }
 </style>

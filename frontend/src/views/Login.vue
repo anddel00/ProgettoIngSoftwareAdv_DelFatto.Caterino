@@ -27,10 +27,12 @@ const faiLogin = async () => {
       password: password.value
     });
 
-    const utenteLoggato = response.data;
+    const token = response.data.token;
+    const utenteLoggato = response.data.utente;
     const ruoloUtente = utenteLoggato.ruolo;
 
     sessionStorage.clear();
+    sessionStorage.setItem('token', token);
     sessionStorage.setItem('nomeUtente', utenteLoggato.nome + ' ' + utenteLoggato.cognome);
     sessionStorage.setItem('emailUtente', utenteLoggato.email);
     sessionStorage.setItem('ruolo', ruoloUtente);

@@ -101,6 +101,20 @@ onMounted(() => {
   fetchTurniAttivi()
 })
 
+const labelScaffale = (idScaffale, y, x, z) => {
+  if (!idScaffale) return null
+  return `S${idScaffale} · R${y + 1} C${x + 1} P${z + 1}`
+}
+
+const getPercorso = (record) => {
+  const inizio = labelScaffale(record.idScaffaleInizio, record.vecchiaY, record.vecchiaX, record.vecchiaZ)
+  const fine   = labelScaffale(record.idScaffaleFine,   record.nuovaY,  record.nuovaX,  record.nuovaZ)
+  if (record.tipoTask === 'SPOSTAMENTO') return { da: inizio || '—', a: fine || '—', tipo: 'sposta' }
+  if (record.tipoTask === 'PRELIEVO')    return { da: inizio || '—', a: 'In attesa', tipo: 'preleva' }
+  if (record.tipoTask === 'DEPOSITO')    return { da: 'In attesa', a: fine || '—',   tipo: 'deposita' }
+  return { da: '—', a: '—', tipo: '' }
+}
+
 const vaiAGestioneTask = () => { router.push('/GestioneTask') }
 const vaiAStorico = () => { router.push('/StoricoMovimenti') }
 </script>
@@ -194,6 +208,14 @@ const vaiAStorico = () => { router.push('/StoricoMovimenti') }
                     <span class="glass-badge badge-success">COMPLETATO</span>
                   </div>
                   <p class="item-desc">{{ task.descrizione }}</p>
+                  <div class="task-details">
+                    <span v-if="task.nomeReparto" class="reparto-badge">{{ task.nomeReparto }}</span>
+                    <div v-if="getPercorso(task).tipo" class="route-wrap" :class="'route-' + getPercorso(task).tipo">
+                      <span class="route-slot">{{ getPercorso(task).da }}</span>
+                      <svg class="route-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+                      <span class="route-slot" :class="{'route-attesa': getPercorso(task).a === 'In attesa' || getPercorso(task).da === 'In attesa'}">{{ getPercorso(task).a }}</span>
+                    </div>
+                  </div>
                   <span class="operator-name">Da: <strong>{{ task.nomeDipendente || 'Operatore' }}</strong></span>
                 </div>
               </div>
@@ -219,6 +241,14 @@ const vaiAStorico = () => { router.push('/StoricoMovimenti') }
                     <span class="glass-badge badge-active">IN CARICO</span>
                   </div>
                   <p class="item-desc">{{ task.descrizione }}</p>
+                  <div class="task-details">
+                    <span v-if="task.nomeReparto" class="reparto-badge">{{ task.nomeReparto }}</span>
+                    <div v-if="getPercorso(task).tipo" class="route-wrap" :class="'route-' + getPercorso(task).tipo">
+                      <span class="route-slot">{{ getPercorso(task).da }}</span>
+                      <svg class="route-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+                      <span class="route-slot" :class="{'route-attesa': getPercorso(task).a === 'In attesa' || getPercorso(task).da === 'In attesa'}">{{ getPercorso(task).a }}</span>
+                    </div>
+                  </div>
                 </div>
                 <div class="task-meta">
                   <div class="operator-chip">
@@ -456,7 +486,17 @@ const vaiAStorico = () => { router.push('/StoricoMovimenti') }
 .task-header { display: flex; align-items: center; gap: 10px; }
 .task-id { font-size: 13px; font-weight: 700; color: #64748b; font-family: monospace; }
 .item-desc { margin: 0; font-size: 15px; font-weight: 600; color: #1e293b; }
-.operator-name { font-size: 12px; color: #64748b; }
+.operator-name { font-size: 12px; color: #64748b; margin-top: 4px; }
+
+.task-details { display: flex; align-items: center; gap: 8px; margin-top: 2px; margin-bottom: 2px; flex-wrap: wrap;}
+.reparto-badge { background: #e0e7ff; color: #4338ca; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; border: 1px solid rgba(67, 56, 202, 0.2); }
+.route-wrap { display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; padding: 3px 6px; border-radius: 6px; width: fit-content; }
+.route-sposta  { background: rgba(139,92,246,0.08); border: 1px solid rgba(139,92,246,0.15); }
+.route-preleva { background: rgba(239,68,68,0.07);  border: 1px solid rgba(239,68,68,0.15); }
+.route-deposita{ background: rgba(16,185,129,0.07); border: 1px solid rgba(16,185,129,0.15); }
+.route-slot { font-family: 'Courier New', monospace; font-size: 10px; color: #334155; padding: 2px 4px; background: rgba(255,255,255,0.7); border-radius: 4px; white-space: nowrap; }
+.route-attesa { color: #94a3b8 !important; background: #f8fafc !important; font-style: italic; }
+.route-arrow { width: 10px; height: 10px; color: #94a3b8; flex-shrink: 0; }
 
 .glass-badge {
   font-size: 10px; font-weight: 800; padding: 4px 8px; border-radius: 6px;

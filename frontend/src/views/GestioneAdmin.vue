@@ -16,9 +16,7 @@ const utenteSelezionatoId = ref(null)
 const errorMessage = ref('')
 
 // --- VARIABILI PER LA SICUREZZA ENTERPRISE ---
-const staVerificandoAdmin = ref(false)
-const isPasswordUnlocked = ref(false)
-const adminPassword = ref('')
+// Rimossi check manuali, la sicurezza è gestita dal JWT.
 
 const form = ref({
   nome: '',
@@ -51,8 +49,6 @@ onMounted(() => caricaDipendenti())
 const apriModaleAggiungi = () => {
   isModifica.value = false
   errorMessage.value = ''
-  staVerificandoAdmin.value = false
-  isPasswordUnlocked.value = false
   form.value = { nome: '', cognome: '', data_nascita: '', email: '', password: '', confermaPassword: '', ruolo: 'Admin' }
   mostraModale.value = true
 }
@@ -61,10 +57,6 @@ const apriModaleModifica = (dipendente) => {
   isModifica.value = true
   utenteSelezionatoId.value = dipendente.id
   errorMessage.value = ''
-
-  staVerificandoAdmin.value = false
-  isPasswordUnlocked.value = false
-  adminPassword.value = ''
 
   let dataFormattata = '';
   if (dipendente.data_nascita) {
@@ -86,32 +78,6 @@ const apriModaleModifica = (dipendente) => {
 
 const chiudiModale = () => {
   mostraModale.value = false
-}
-
-// ==========================================
-// 3. LOGICA DI SICUREZZA ENTERPRISE
-// ==========================================
-const sbloccaCambioPassword = async () => {
-  errorMessage.value = '';
-  const emailAdmin = sessionStorage.getItem('emailUtente');
-
-  if (!emailAdmin) {
-    errorMessage.value = "Errore di sistema: Email Admin non trovata.";
-    return;
-  }
-
-  try {
-    await api.post('/api/auth/login', {
-      email: emailAdmin,
-      password: adminPassword.value
-    });
-
-    isPasswordUnlocked.value = true;
-    staVerificandoAdmin.value = false;
-    adminPassword.value = '';
-  } catch (error) {
-    errorMessage.value = "Password Amministratore non valida.";
-  }
 }
 
 // ==========================================
@@ -154,7 +120,15 @@ const salvaDipendente = async () => {
     caricaDipendenti()
 
   } catch (error) {
-    errorMessage.value = error.response?.data || "Errore di connessione al server."
+    if (error.response && error.response.data) {
+      if (error.response.data.error) {
+        errorMessage.value = error.response.data.error; // Es: "Errore: L'email inserita è già in uso!"
+      } else {
+        errorMessage.value = Object.values(error.response.data).join(', ');
+      }
+    } else {
+      errorMessage.value = "Errore di connessione al server."
+    }
   }
 }
 
@@ -300,32 +274,11 @@ const eliminaDipendente = async (id) => {
           </template>
 
           <template v-if="isModifica">
-            <div class="security-box" :class="{ 'is-unlocked': isPasswordUnlocked, 'is-verifying': staVerificandoAdmin }">
-
-              <div v-if="!isPasswordUnlocked && !staVerificandoAdmin" class="locked-state">
-                <div class="security-info">
-                  <svg class="icon-lock" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
-                  <div>
-                    <h4>Sicurezza Account</h4>
-                    <p>La modifica della password è protetta.</p>
-                  </div>
-                </div>
-                <button @click="staVerificandoAdmin = true" class="btn-unlock-glass">Sblocca</button>
-              </div>
-
-              <div v-if="staVerificandoAdmin" class="verify-state">
-                <label>Conferma la tua identità Admin</label>
-                <input v-model="adminPassword" type="password" class="glass-input-warning" placeholder="Inserisci la tua password..." />
-                <div class="verify-actions">
-                  <button @click="staVerificandoAdmin = false" class="btn-ghost small">Annulla</button>
-                  <button @click="sbloccaCambioPassword" class="btn-warning-glass small">Verifica</button>
-                </div>
-              </div>
-
-              <div v-if="isPasswordUnlocked" class="unlocked-state">
+            <div class="security-box is-unlocked">
+              <div class="unlocked-state">
                 <div class="security-info success">
                   <svg class="icon-unlock" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"></path></svg>
-                  <label>Imposta nuova password</label>
+                  <label>Imposta nuova password (Opzionale)</label>
                 </div>
                 <input v-model="form.password" type="password" class="glass-input-success" placeholder="Lascia vuoto per non cambiare" />
               </div>

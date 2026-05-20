@@ -12,6 +12,10 @@ public class TaskDTO {
     private Long idBatch;
     private Long idScaffaleInizio;
     private Long idScaffaleFine;
+    private String nomeReparto;     // ricavato da scaffale_inizio.reparto (o scaffale_fine)
+    private int vecchiaX;
+    private int vecchiaY;
+    private int vecchiaZ;
     private int nuovaX;
     private int nuovaY;
     private int nuovaZ;
@@ -51,6 +55,9 @@ public class TaskDTO {
     public Long getIdScaffaleFine() { return idScaffaleFine; }
     public void setIdScaffaleFine(Long idScaffaleFine) { this.idScaffaleFine = idScaffaleFine; }
 
+    public String getNomeReparto() { return nomeReparto; }
+    public void setNomeReparto(String nomeReparto) { this.nomeReparto = nomeReparto; }
+
     public int getNuovaX() { return nuovaX; }
     public void setNuovaX(int nuovaX) { this.nuovaX = nuovaX; }
 
@@ -59,4 +66,13 @@ public class TaskDTO {
 
     public int getNuovaZ() { return nuovaZ; }
     public void setNuovaZ(int nuovaZ) { this.nuovaZ = nuovaZ; }
+    
+    public int getVecchiaX() { return vecchiaX; }
+    public void setVecchiaX(int vecchiaX) { this.vecchiaX = vecchiaX; }
+
+    public int getVecchiaY() { return vecchiaY; }
+    public void setVecchiaY(int vecchiaY) { this.vecchiaY = vecchiaY; }
+
+    public int getVecchiaZ() { return vecchiaZ; }
+    public void setVecchiaZ(int vecchiaZ) { this.vecchiaZ = vecchiaZ; }
 }

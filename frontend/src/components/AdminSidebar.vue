@@ -1,7 +1,8 @@
 <script setup>
 import { useRouter, useRoute } from 'vue-router'
-import { watch, onMounted } from "vue";
+import { ref, watch, onMounted } from "vue";
 import { useWmsWebSocket } from '../composables/useWmsWebSocket.js'
+import api from '../api.js'
 
 const router = useRouter()
 const route = useRoute()
@@ -14,6 +15,38 @@ const {
   azzeraBadgeCompletati,
   connectWebSocket
 } = useWmsWebSocket()
+
+// --- STATO DROPDOWN MAPPA ---
+const mappaAperta = ref(false)
+const reparti = ref([])
+const repartiLoading = ref(false)
+
+const toggleMappa = async () => {
+  mappaAperta.value = !mappaAperta.value
+  if (mappaAperta.value && reparti.value.length === 0) {
+    repartiLoading.value = true
+    try {
+      const res = await api.get('/api/reparti/carica')
+      reparti.value = res.data
+    } catch (e) {
+      console.error('Errore caricamento reparti:', e)
+    } finally {
+      repartiLoading.value = false
+    }
+  }
+}
+
+const vaiAlReparto = (id) => {
+  router.push(`/Mappa/reparto/${id}`)
+  mappaAperta.value = false
+}
+
+// Badge temperatura → classe colore
+const getTempClass = (temp) => {
+  if (temp < 0) return 'temp-freezing'
+  if (temp <= 8) return 'temp-cold'
+  return 'temp-warm'
+}
 
 const logout = () => {
   sessionStorage.clear()
@@ -34,6 +67,8 @@ watch(() => route.path, (nuovoPath) => {
   } else if (nuovoPath === '/StoricoMovimenti') {
     azzeraBadgeCompletati()
   }
+  // Chiudi dropdown mappa al cambio pagina
+  mappaAperta.value = false
 }, { immediate: true })
 </script>
 
@@ -62,9 +97,41 @@ watch(() => route.path, (nuovoPath) => {
         </span>
       </div>
 
-      <div class="nav-item":class="{active: route.path === '/MappaOverview'}" @click="router.push('/MappaOverview')">
-        <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path></svg>
-        Mappa
+      <!-- VOCE MAPPA CON DROPDOWN -->
+      <div>
+        <div
+          class="nav-item"
+          :class="{ active: route.path.startsWith('/Mappa') || mappaAperta }"
+          @click="toggleMappa"
+        >
+          <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path></svg>
+          Mappa
+          <svg
+            class="chevron-icon"
+            :class="{ 'chevron-open': mappaAperta }"
+            fill="none" stroke="currentColor" viewBox="0 0 24 24"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+          </svg>
+        </div>
+
+        <!-- Dropdown reparti -->
+        <div class="reparto-dropdown" :class="{ 'dropdown-open': mappaAperta }">
+          <div v-if="repartiLoading" class="reparto-loading">
+            <span>Caricamento...</span>
+          </div>
+          <div
+            v-for="reparto in reparti"
+            :key="reparto.id"
+            class="reparto-item"
+            :class="{ 'active-reparto': route.path === `/Mappa/reparto/${reparto.id}` }"
+            @click="vaiAlReparto(reparto.id)"
+          >
+            <span class="reparto-temp-dot" :class="getTempClass(reparto.temperatura)"></span>
+            <span class="reparto-nome">{{ reparto.nome }}</span>
+            <span class="reparto-temp-label">{{ reparto.temperatura }}°C</span>
+          </div>
+        </div>
       </div>
 
       <div class="nav-item" :class="{ active: route.path === '/GestioneAdmin' }" @click="router.push('/GestioneAdmin')">
@@ -143,7 +210,8 @@ watch(() => route.path, (nuovoPath) => {
   padding: 0 16px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
+  overflow-y: auto;
 }
 
 /* --- TASTI DI NAVIGAZIONE --- */
@@ -165,6 +233,7 @@ watch(() => route.path, (nuovoPath) => {
   height: 20px;
   opacity: 0.7;
   transition: opacity 0.2s ease;
+  flex-shrink: 0;
 }
 
 /* Hover: Sfondo leggermente più chiaro ma senza bagliori confusi */
@@ -187,6 +256,91 @@ watch(() => route.path, (nuovoPath) => {
 
 .nav-item.active .nav-icon {
   opacity: 1;
+}
+
+/* --- CHEVRON --- */
+.chevron-icon {
+  width: 14px;
+  height: 14px;
+  margin-left: auto;
+  opacity: 0.5;
+  transition: transform 0.25s ease, opacity 0.2s ease;
+  flex-shrink: 0;
+}
+.chevron-open {
+  transform: rotate(90deg);
+  opacity: 1;
+}
+
+/* --- DROPDOWN REPARTI --- */
+.reparto-dropdown {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.25s ease;
+  opacity: 0;
+  margin: 0 8px;
+}
+.dropdown-open {
+  max-height: 300px;
+  opacity: 1;
+}
+
+.reparto-loading {
+  padding: 10px 16px;
+  font-size: 0.8rem;
+  color: rgba(148, 163, 184, 0.7);
+  font-style: italic;
+}
+
+.reparto-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 16px 9px 22px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: #94a3b8;
+  transition: all 0.18s ease;
+  border: 1px solid transparent;
+  margin-bottom: 2px;
+}
+
+.reparto-item:hover {
+  background-color: rgba(255, 255, 255, 0.07);
+  color: #e2e8f0;
+}
+
+.reparto-item.active-reparto {
+  background-color: rgba(59, 130, 246, 0.12);
+  color: #60a5fa;
+  border-color: rgba(59, 130, 246, 0.15);
+}
+
+.reparto-temp-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.temp-freezing { background: #60a5fa; box-shadow: 0 0 4px rgba(96, 165, 250, 0.6); }
+.temp-cold     { background: #38bdf8; box-shadow: 0 0 4px rgba(56, 189, 248, 0.5); }
+.temp-warm     { background: #fbbf24; box-shadow: 0 0 4px rgba(251, 191, 36, 0.5); }
+
+.reparto-nome {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reparto-temp-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: rgba(148, 163, 184, 0.6);
+  flex-shrink: 0;
 }
 
 /* --- FOOTER / DISCONNETTI --- */

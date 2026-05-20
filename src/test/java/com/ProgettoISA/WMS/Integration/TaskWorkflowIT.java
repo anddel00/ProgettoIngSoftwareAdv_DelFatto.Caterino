@@ -23,8 +23,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.security.test.context.support.WithMockUser;
+
 @SpringBootTest
 @AutoConfigureMockMvc
+@WithMockUser(roles = "Admin")
 @Transactional // Rollback automatico a fine test
 @ActiveProfiles("test") // Usa Testcontainers con PostgreSQL
 public class TaskWorkflowIT {

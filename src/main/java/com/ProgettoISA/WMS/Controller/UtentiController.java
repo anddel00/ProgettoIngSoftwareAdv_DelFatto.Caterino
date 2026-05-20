@@ -2,6 +2,7 @@ package com.ProgettoISA.WMS.Controller;
 
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
 import java.util.stream.Collectors;
 
 import com.ProgettoISA.WMS.Repository.TurniDipRepository;
@@ -17,9 +18,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.ProgettoISA.WMS.DTO.LoginRequestDTO;
+import com.ProgettoISA.WMS.DTO.RegistrazioneRequestDTO;
 import com.ProgettoISA.WMS.DTO.UtentiDTO;
 import com.ProgettoISA.WMS.Model.Utenti;
+import com.ProgettoISA.WMS.Security.JwtService;
 import com.ProgettoISA.WMS.Service.UtentiService;
+import jakarta.validation.Valid;
 
 @RestController //trasferiamo i dati in JSON
 @RequestMapping("/api/auth") //URL base per tutti gli endpoint di questo controller
@@ -29,6 +34,9 @@ public class UtentiController {
     @Autowired
     private UtentiService utentiService;
 
+    @Autowired
+    private JwtService jwtService;
+
     //L'URL localhost:8080 VIENE GESTITO DAL FILE api.js
 
     // ==========================================
@@ -36,51 +44,32 @@ public class UtentiController {
     // URL: POST http://localhost:8080/api/auth/registrati //prima passavo il nomeRuolo nell'URL--> così è più pulito
     // ==========================================
     @PostMapping("/registrati")
-    public ResponseEntity<?> registraUtente(@RequestBody Map<String, Object> payload) {
-        try {
-            // 2. Costruiamo l'utente con i dati restanti del JSON
-            Utenti nuovoUtente = new Utenti();
-            nuovoUtente.setNome((String) payload.get("nome"));
-            nuovoUtente.setCognome((String) payload.get("cognome"));
-            nuovoUtente.setEmail((String) payload.get("email"));
-            nuovoUtente.setPassword((String) payload.get("password"));
+    public ResponseEntity<?> registraUtente(@Valid @RequestBody RegistrazioneRequestDTO payload) {
+        // La validazione fallirà in automatico grazie a @Valid se mancano campi obbligatori.
+        
+        Utenti nuovoUtente = new Utenti();
+        nuovoUtente.setNome(payload.getNome());
+        nuovoUtente.setCognome(payload.getCognome());
+        nuovoUtente.setEmail(payload.getEmail());
+        nuovoUtente.setPassword(payload.getPassword());
+        nuovoUtente.setUsername(payload.getUsername());
 
-            // AGGIUNGI QUESTA RIGA:
-            nuovoUtente.setUsername((String) payload.get("username"));
+        if (payload.getData_nascita() != null && !payload.getData_nascita().isEmpty()) {
+            nuovoUtente.setData_nascita(java.sql.Date.valueOf(payload.getData_nascita()));
+        }
 
-            //parsing data di nascita
-            String dataStringa = (String) payload.get("data_nascita");
-            if (dataStringa != null && !dataStringa.isEmpty()) {
-                nuovoUtente.setData_nascita(java.sql.Date.valueOf(dataStringa));
-            }
-
-            String nomeRuolo = (String) payload.get("ruolo");
-
-            // 3. Passiamo tutto al Service
-            Utenti utenteSalvato = utentiService.registraUtente(nuovoUtente, nomeRuolo);
-            return ResponseEntity.ok(utenteSalvato);
-
-        }  catch (IllegalArgumentException e) {
-        e.printStackTrace(); // <--- AGGIUNGI QUESTO
-        return ResponseEntity.badRequest().body(e.getMessage());
-    } catch (Exception e) {
-        e.printStackTrace(); // <--- AGGIUNGI QUESTO
-        return ResponseEntity.badRequest().body("Errore nel formato dei dati inviati.");
-    }
+        Utenti utenteSalvato = utentiService.registraUtente(nuovoUtente, payload.getRuolo());
+        return ResponseEntity.ok(utenteSalvato);
     }
 
-    // 2. LOGIN
+    // ==========================================
+    // 2. LOGIN (restituisce JWT)
     // URL: POST http://localhost:8080/api/auth/login
-
+    // ==========================================
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody Map<String, String> credenziali) {
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequestDTO credenziali) {
         try {
-            // Estraiamo email e password dal JSON inviato da Vue.js
-            String email = credenziali.get("email");
-            String password = credenziali.get("password");
-
-            // Chiamiamo il Service
-            Utenti utenteLoggato = utentiService.effettuaLogin(email, password);
+            Utenti utenteLoggato = utentiService.effettuaLogin(credenziali.getEmail(), credenziali.getPassword());
 
             UtentiDTO utenteDTO = new UtentiDTO(
                     utenteLoggato.getId(),
@@ -88,15 +77,24 @@ public class UtentiController {
                     utenteLoggato.getNome(),
                     utenteLoggato.getCognome(),
                     utenteLoggato.getEmail(),
-                    utenteLoggato.getRuolo().getNomeRuolo(),//assumendo che Ruoli abbia un campo nomeRuolo
+                    utenteLoggato.getRuolo() != null ? utenteLoggato.getRuolo().getNomeRuolo() : "N/A",
                     utenteLoggato.getData_nascita()
             );
-            // Se tutto va bene, restituiamo i dati dell'utente in JSON
-            return ResponseEntity.ok(utenteDTO);
+
+            // Generiamo il token JWT
+            String token = jwtService.generateToken(utenteLoggato.getEmail(), utenteDTO.getRuolo());
+
+            // Restituiamo il token insieme ai dati dell'utente
+            Map<String, Object> response = new HashMap<>();
+            response.put("token", token);
+            response.put("utente", utenteDTO);
+
+            return ResponseEntity.ok(response);
 
         } catch (IllegalArgumentException e) {
-
-            return ResponseEntity.status(401).body(e.getMessage()); //il 401 è un errore di autenticazione
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("error", e.getMessage());
+            return ResponseEntity.status(401).body(errorResponse);
         }
     }
 

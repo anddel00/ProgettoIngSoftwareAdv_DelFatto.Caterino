@@ -45,6 +45,7 @@ const isSaving = ref(false);
 const isSavingAssignments = ref(false);
 
 const lottiInSistemazione = ref([]);
+const lottiInMovimento = ref([]); // Lotti rimossi da uno slot e in attesa di essere riposizionati
 const isSidebarOpen = ref(true);
 const activeTab = ref('da_sistemare'); // 'da_sistemare' | 'in_sistemazione'
 const scaffaleSelezionato = ref(null);
@@ -122,7 +123,7 @@ const calcolaSpazioOccupatoCella = (idMappa, altezza, riga, colonna) => {
   });
 
   const merceInArrivo = taskAttiviDati.value.filter(task => 
-    task.tipoTask === 'DEPOSITO' &&
+    (task.tipoTask === 'DEPOSITO' || task.tipoTask === 'SPOSTAMENTO') &&
     Number(task.idScaffaleFine) === Number(idMappa) &&
     Number(task.nuovaZ) === Number(altezza) &&
     Number(task.nuovaY) === Number(riga) &&
@@ -144,7 +145,7 @@ const calcolaPesoOccupatoScaffale = (idMappa) => {
     peso += (item.qta * (prodotto ? prodotto.pesoUnitario || 0 : 0));
   });
   
-  const merceInArrivo = taskAttiviDati.value.filter(task => task.tipoTask === 'DEPOSITO' && Number(task.idScaffaleFine) === Number(idMappa));
+  const merceInArrivo = taskAttiviDati.value.filter(task => (task.tipoTask === 'DEPOSITO' || task.tipoTask === 'SPOSTAMENTO') && Number(task.idScaffaleFine) === Number(idMappa));
   merceInArrivo.forEach(task => {
     const prodotto = getProdottoDaBatch(task.idBatch);
     peso += (task.quantita * (prodotto ? prodotto.pesoUnitario || 0 : 0));
@@ -283,9 +284,14 @@ const apriModaleDettaglio = (cella, rigaLocale, colonnaLocale, pianoAttuale) => 
     Number(bs.riga) === Number(rigaLocale) && Number(bs.colonna) === Number(colonnaLocale)
   );
   const merceInArrivo = taskAttiviDati.value.filter(task => 
-    task.tipoTask === 'DEPOSITO' &&
+    (task.tipoTask === 'DEPOSITO' || task.tipoTask === 'SPOSTAMENTO') &&
     Number(task.idScaffaleFine) === Number(cella.id) && Number(task.nuovaZ) === Number(pianoAttuale) &&
     Number(task.nuovaY) === Number(rigaLocale) && Number(task.nuovaX) === Number(colonnaLocale)
+  );
+  const merceInUscita = taskAttiviDati.value.filter(task => 
+    (task.tipoTask === 'PRELIEVO' || task.tipoTask === 'SPOSTAMENTO') &&
+    Number(task.idScaffaleInizio) === Number(cella.id) && Number(task.vecchiaZ) === Number(pianoAttuale) &&
+    Number(task.vecchiaY) === Number(rigaLocale) && Number(task.vecchiaX) === Number(colonnaLocale)
   );
   
   const merceMista = [...merceCellaVecchia, ...merceCellaNuova];
@@ -312,6 +318,15 @@ const apriModaleDettaglio = (cella, rigaLocale, colonnaLocale, pianoAttuale) => 
         batch: batchInfo,
         prodotto: getProdottoDaBatch(task.idBatch)
       };
+    }),
+    inUscita: merceInUscita.map(task => {
+      const batchInfo = tuttiIBatch.value.find(b => Number(b.id) === Number(task.idBatch));
+      return {
+        taskId: task.id,
+        qta: task.quantita,
+        batch: batchInfo,
+        prodotto: getProdottoDaBatch(task.idBatch)
+      };
     })
   };
 };
@@ -322,6 +337,11 @@ const rimuoviDaCella = (elementoModale) => {
     alert("Quantità da rimuovere non valida."); return;
   }
 
+  // Cattura il label dello slot sorgente prima che il modal venga chiuso
+  const fromSlotLabel = cellaDettaglioAttiva.value
+    ? `S${cellaDettaglioAttiva.value.scaffaleId} · R${cellaDettaglioAttiva.value.riga + 1} C${cellaDettaglioAttiva.value.colonna + 1} P${cellaDettaglioAttiva.value.piano + 1}`
+    : '';
+
   let lottoInSidebar = lottiSospesi.value.find(l => Number(l.id) === Number(elementoModale.idBatchProdotti));
   if (!lottoInSidebar) {
     lottoInSidebar = tuttiIBatch.value.find(b => Number(b.id) === Number(elementoModale.idBatchProdotti));
@@ -330,32 +350,49 @@ const rimuoviDaCella = (elementoModale) => {
 
   if (lottoInSidebar) lottoInSidebar.quantita += qtaTogliere;
 
-  elementoModale.refOriginale.qta -= qtaTogliere;
-  elementoModale.qta -= qtaTogliere; 
-
   if (elementoModale.isNuovo) {
+    elementoModale.refOriginale.qta -= qtaTogliere;
+    elementoModale.qta -= qtaTogliere;
     if (elementoModale.refOriginale.qta <= 0) nuoviAssegnamenti.value = nuoviAssegnamenti.value.filter(na => na !== elementoModale.refOriginale);
   } else {
     let tracciaModifica = modifichePendenti.value.find(m => Number(m.id) === Number(elementoModale.refOriginale.id));
     if (!tracciaModifica) {
-      tracciaModifica = { ...elementoModale.refOriginale };
+      tracciaModifica = { ...elementoModale.refOriginale, originalQta: elementoModale.refOriginale.qta };
       modifichePendenti.value.push(tracciaModifica);
     }
+
+    elementoModale.refOriginale.qta -= qtaTogliere;
+    elementoModale.qta -= qtaTogliere;
     tracciaModifica.qta = elementoModale.refOriginale.qta;
-    
+
     if (elementoModale.refOriginale.qta <= 0) {
       batchScaffaliDati.value = batchScaffaliDati.value.filter(bs => Number(bs.id) !== Number(elementoModale.refOriginale.id));
     }
   }
 
   if (elementoModale.qta <= 0) cellaDettaglioAttiva.value.elementi = cellaDettaglioAttiva.value.elementi.filter(e => e !== elementoModale);
-  cellaDettaglioAttiva.value.spazioOccupato = calcolaSpazioOccupatoCella(cellaDettaglioAttiva.value.idMappa, cellaDettaglioAttiva.value.piano, cellaDettaglioAttiva.value.riga, cellaDettaglioAttiva.value.colonna);
-  
-  if(lottoDaAssegnare.value && Number(lottoDaAssegnare.value.id) === Number(elementoModale.idBatchProdotti)) {
-    quantitaSelezionata.value = 1;
+  cellaDettaglioAttiva.value.spazioOccupato = calcolaSpazioOccupatoCella(
+    cellaDettaglioAttiva.value.idMappa, cellaDettaglioAttiva.value.piano,
+    cellaDettaglioAttiva.value.riga, cellaDettaglioAttiva.value.colonna
+  );
+
+  // --- NOVITÀ: Tracciamento "In Spostamento" + auto-selezione per posizionamento immediato ---
+  if (lottoInSidebar) {
+    const esistente = lottiInMovimento.value.find(m => Number(m.lotto.id) === Number(lottoInSidebar.id));
+    if (esistente) {
+      esistente.qtaMossa += qtaTogliere;
+      esistente.fromSlotLabel = fromSlotLabel;
+    } else {
+      lottiInMovimento.value.push({ lotto: lottoInSidebar, qtaMossa: qtaTogliere, fromSlotLabel });
+    }
+    // Auto-seleziona il lotto: il prossimo click su uno slot lo depositerà direttamente
+    lottoDaAssegnare.value = lottoInSidebar;
+    quantitaSelezionata.value = Math.min(qtaTogliere, lottoInSidebar.quantita);
   }
 
-  if (cellaDettaglioAttiva.value.elementi.length === 0) chiudiDettaglioCella();
+  // Chiudi il modal e assicurati che la sidebar sia aperta (mostra sezione "In Spostamento")
+  chiudiDettaglioCella();
+  isSidebarOpen.value = true;
 };
 
 // --- GESTISCI CLICK SULLO SLOT E INSERIMENTO ---
@@ -426,13 +463,18 @@ const gestisciClickCella = (cella, slotIndex) => {
     }
 
     if (lottoDaAssegnare.value.quantita <= 0) {
+      // Lotto completamente piazzato: rimuovilo da tutte le liste
       lottiSospesi.value = lottiSospesi.value.filter(l => Number(l.id) !== Number(lottoDaAssegnare.value.id));
+      lottiInMovimento.value = lottiInMovimento.value.filter(m => Number(m.lotto.id) !== Number(lottoDaAssegnare.value.id));
       lottoDaAssegnare.value = null;
     } else {
-      quantitaSelezionata.value = 1;
+      // Lotto parzialmente piazzato: aggiorna la quantità residua in "In Spostamento"
+      const movEntry = lottiInMovimento.value.find(m => Number(m.lotto.id) === Number(lottoDaAssegnare.value.id));
+      if (movEntry) movEntry.qtaMossa = lottoDaAssegnare.value.quantita;
+      quantitaSelezionata.value = Math.min(1, lottoDaAssegnare.value.quantita);
     }
-    
-    cellaSuggerita.value = null; 
+
+    cellaSuggerita.value = null;
 
   } else {
     apriModaleDettaglio(cella, rigaLocale, colonnaLocale, pianoAttuale);
@@ -444,41 +486,98 @@ const salvaAssegnamenti = async () => {
   isSavingAssignments.value = true;
   try {
     const tasksDaCreare = [];
-    
-    // Per i nuovi assegnamenti (ingresso)
-    for (const na of nuoviAssegnamenti.value) {
-      const lotto = tuttiIBatch.value.find(b => Number(b.id) === Number(na.idBatchProdotti));
-      const prodotto = getProdottoDaBatch(na.idBatchProdotti);
-      tasksDaCreare.push({
-        descrizione: `Sistemazione in ingresso: ${prodotto?.nome || 'Prodotto'} (Lotto #${lotto?.id})`,
-        tipoTask: 'DEPOSITO',
-        quantita: na.qta,
-        idBatch: na.idBatchProdotti,
-        idScaffaleFine: na.idMappa,
-        nuovaX: na.colonna, 
-        nuovaY: na.riga,
-        nuovaZ: na.altezza
-      });
-    }
-    
+
+    // --- LOGICA SPOSTAMENTO ---
+    // Costruiamo set di batch rimossi e batch inseriti per trovare gli SPOSTAMENTI
+    // Un batch rimosso da uno scaffale e inserito in un altro = task SPOSTAMENTO unico
+    const batchRimossiMap = new Map(); // idBatch -> entry modifichePendenti
     for (const mp of modifichePendenti.value) {
-      const original = batchScaffaliDati.value.find(bs => Number(bs.id) === Number(mp.id));
-      if (!original) continue;
-      const differenza = original.qta - mp.qta;
+      const differenza = mp.originalQta - mp.qta;
       if (differenza > 0) {
-        // Rimozione dallo scaffale
-        const prodotto = getProdottoDaBatch(mp.idBatchProdotti);
+        batchRimossiMap.set(Number(mp.idBatchProdotti), { mp, differenza });
+      }
+    }
+
+    const batchInseriti = new Set(); // idBatch già trattati come parte di uno SPOSTAMENTO
+
+    // Prima passata: nuovi assegnamenti — cerca se c'è anche un prelievo dello stesso batch
+    for (const na of nuoviAssegnamenti.value) {
+      const idBatch = Number(na.idBatchProdotti);
+      const rimosso = batchRimossiMap.get(idBatch);
+
+      if (rimosso) {
+        // SPOSTAMENTO: stesso batch tolto da uno scaffale e messo in un altro
+        const prodotto = getProdottoDaBatch(idBatch);
+        const lotto = tuttiIBatch.value.find(b => Number(b.id) === idBatch);
+        const qtaSpostamento = Math.min(na.qta, rimosso.differenza);
+
         tasksDaCreare.push({
-          descrizione: `Prelievo da scaffale: ${prodotto?.nome || 'Prodotto'} (Lotto #${mp.idBatchProdotti})`,
-          tipoTask: 'PRELIEVO',
-          quantita: differenza,
-          idBatch: mp.idBatchProdotti,
-          idScaffaleInizio: mp.idMappa,
-          vecchiaX: mp.colonna, 
-          vecchiaY: mp.riga,
-          vecchiaZ: mp.altezza
+          descrizione: `Spostamento: ${prodotto?.nome || 'Prodotto'} (Lotto #${lotto?.id}) → nuovo slot`,
+          tipoTask: 'SPOSTAMENTO',
+          quantita: qtaSpostamento,
+          idBatch: idBatch,
+          // Scaffale di partenza (prelievo)
+          idScaffaleInizio: rimosso.mp.idMappa,
+          vecchiaX: rimosso.mp.colonna,
+          vecchiaY: rimosso.mp.riga,
+          vecchiaZ: rimosso.mp.altezza,
+          // Scaffale di destinazione (deposito)
+          idScaffaleFine: na.idMappa,
+          nuovaX: na.colonna,
+          nuovaY: na.riga,
+          nuovaZ: na.altezza
+        });
+
+        batchInseriti.add(idBatch);
+
+        // Se la quantità rimossa era maggiore di quella inserita, rimane ancora un PRELIEVO residuo
+        if (rimosso.differenza > qtaSpostamento) {
+          const prodotto = getProdottoDaBatch(idBatch);
+          tasksDaCreare.push({
+            descrizione: `Prelievo da scaffale: ${prodotto?.nome || 'Prodotto'} (Lotto #${idBatch})`,
+            tipoTask: 'PRELIEVO',
+            quantita: rimosso.differenza - qtaSpostamento,
+            idBatch: idBatch,
+            idScaffaleInizio: rimosso.mp.idMappa,
+            vecchiaX: rimosso.mp.colonna,
+            vecchiaY: rimosso.mp.riga,
+            vecchiaZ: rimosso.mp.altezza
+          });
+        }
+
+        // Segniamo il batch rimosso come già gestito
+        batchRimossiMap.delete(idBatch);
+
+      } else {
+        // DEPOSITO puro: nuovo lotto che non era in nessun scaffale
+        const prodotto = getProdottoDaBatch(idBatch);
+        const lotto = tuttiIBatch.value.find(b => Number(b.id) === idBatch);
+        tasksDaCreare.push({
+          descrizione: `Sistemazione in ingresso: ${prodotto?.nome || 'Prodotto'} (Lotto #${lotto?.id})`,
+          tipoTask: 'DEPOSITO',
+          quantita: na.qta,
+          idBatch: idBatch,
+          idScaffaleFine: na.idMappa,
+          nuovaX: na.colonna,
+          nuovaY: na.riga,
+          nuovaZ: na.altezza
         });
       }
+    }
+
+    // Seconda passata: prelievi rimasti (non abbinati a nessun inserimento = PRELIEVO puro)
+    for (const [idBatch, { mp, differenza }] of batchRimossiMap.entries()) {
+      const prodotto = getProdottoDaBatch(idBatch);
+      tasksDaCreare.push({
+        descrizione: `Prelievo da scaffale: ${prodotto?.nome || 'Prodotto'} (Lotto #${idBatch})`,
+        tipoTask: 'PRELIEVO',
+        quantita: differenza,
+        idBatch: idBatch,
+        idScaffaleInizio: mp.idMappa,
+        vecchiaX: mp.colonna,
+        vecchiaY: mp.riga,
+        vecchiaZ: mp.altezza
+      });
     }
     
     if (tasksDaCreare.length > 0) {
@@ -500,6 +599,19 @@ const salvaAssegnamenti = async () => {
 
 const annullaAssegnamenti = () => { window.location.reload(); };
 
+const annullaTask = async (taskId) => {
+  if (confirm(`Sei sicuro di voler annullare il task #${taskId}?`)) {
+    try {
+      await api.delete(`/api/tasks/${taskId}/annulla`);
+      alert("Task annullato con successo.");
+      window.location.reload();
+    } catch (error) {
+      console.error("Errore annullamento:", error);
+      alert(error.response?.data || "Errore durante l'annullamento del task.");
+    }
+  }
+};
+
 const selezionaLotto = (lotto) => {
   if (lottoDaAssegnare.value && Number(lottoDaAssegnare.value.id) === Number(lotto.id)) {
     lottoDaAssegnare.value = null; 
@@ -519,6 +631,43 @@ const lottiInSistemazioneFiltrati = computed(() => {
   if (!repartoVisuale.value) return lottiInSistemazione.value;
   return lottiInSistemazione.value.filter(lotto => isProdottoCompatibileConReparto(lotto.idProdotto, repartoVisuale.value));
 });
+
+// --- TASK IN SISTEMAZIONE: vista arricchita per tipo, con scaffali e dipendente ---
+const tasksInSistemazione = computed(() => {
+  if (!repartoVisuale.value) return [];
+  const scaffaleIdsReparto = new Set(
+    getScaffaliPerReparto(repartoVisuale.value.id).map(s => s.id)
+  );
+  return taskAttiviDati.value
+    .filter(task => {
+      const idI = task.idScaffaleInizio ? Number(task.idScaffaleInizio) : null;
+      const idF = task.idScaffaleFine   ? Number(task.idScaffaleFine)   : null;
+      return (idI && scaffaleIdsReparto.has(idI)) || (idF && scaffaleIdsReparto.has(idF));
+    })
+    .map(task => {
+      const lotto = tuttiIBatch.value.find(b => Number(b.id) === Number(task.idBatch));
+      const labelInizio = task.idScaffaleInizio
+        ? `S${task.idScaffaleInizio} · R${task.vecchiaY + 1} C${task.vecchiaX + 1} P${task.vecchiaZ + 1}`
+        : null;
+      const labelFine = task.idScaffaleFine
+        ? `S${task.idScaffaleFine} · R${task.nuovaY + 1} C${task.nuovaX + 1} P${task.nuovaZ + 1}`
+        : null;
+      return {
+        taskId: task.id,
+        tipoTask: task.tipoTask,
+        quantita: task.quantita,
+        nomeDipendente: task.nomeDipendente || 'N/D',
+        lotto,
+        idLotto: task.idBatch,
+        nomeProdotto: lotto ? getNomeProdotto(lotto.idProdotto) : `Lotto #${task.idBatch}`,
+        labelScaffaleInizio: labelInizio,
+        labelScaffaleFine: labelFine,
+      };
+    });
+});
+const tasksSpostamento = computed(() => tasksInSistemazione.value.filter(t => t.tipoTask === 'SPOSTAMENTO'));
+const tasksPrelievo    = computed(() => tasksInSistemazione.value.filter(t => t.tipoTask === 'PRELIEVO'));
+const tasksDeposito    = computed(() => tasksInSistemazione.value.filter(t => t.tipoTask === 'DEPOSITO'));
 
 const isProdottoCompatibileConReparto = (idProdotto, reparto) => {
   const etichette = getEtichetteProdotto(idProdotto);
@@ -674,8 +823,15 @@ onMounted(async () => {
           .filter(bs => Number(bs.idBatchProdotti) === Number(lotto.id))
           .reduce((sum, item) => sum + item.qta, 0);
           
+        // qtaInArrivoDaTasks: conta solo i DEPOSITO per sottrarre dal "floating" (merci mai assegnate a scaffale)
         const qtaInArrivoDaTasks = taskAttiviDati.value
           .filter(t => Number(t.idBatch) === Number(lotto.id) && t.tipoTask === 'DEPOSITO')
+          .reduce((sum, item) => sum + item.quantita, 0);
+
+        // qtaInSistemazione: conta TUTTI i tipi di task attivi (DEPOSITO, SPOSTAMENTO, PRELIEVO)
+        // per mostrare nel tab "In Sistemazione" qualsiasi batch con operazioni in corso
+        const qtaInSistemazione = taskAttiviDati.value
+          .filter(t => Number(t.idBatch) === Number(lotto.id))
           .reduce((sum, item) => sum + item.quantita, 0);
 
         const qtaAssegnataTotale = qtaGiaAssegnata + qtaInArrivoDaTasks;
@@ -684,7 +840,7 @@ onMounted(async () => {
           ...lotto,
           quantitaTotale: lotto.quantita, 
           quantita: lotto.quantita - qtaAssegnataTotale,
-          qtaInSistemazione: qtaInArrivoDaTasks
+          qtaInSistemazione
         };
       });
 
@@ -708,7 +864,7 @@ onMounted(async () => {
     <div class="main-content">
       <header class="topbar">
         <div class="header-left"><div class="divider"></div><h1>Dettaglio Reparto</h1></div>
-        <button @click="router.push('/MappaOverview')" class="btn-back"><svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>Torna alla Planimetria</button>
+        <button @click="router.back()" class="btn-back"><svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>Torna indietro</button>
       </header>
 
       <main class="content-area">
@@ -810,10 +966,41 @@ onMounted(async () => {
               Da Sistemare <span class="badge badge-tab">{{ lottiDaSistemareFiltrati.length }}</span>
             </button>
             <button class="tab-btn" :class="{'active': activeTab === 'in_sistemazione'}" @click="activeTab = 'in_sistemazione'">
-              In Sistemazione <span class="badge badge-tab badge-yellow">{{ lottiInSistemazioneFiltrati.length }}</span>
+              In Sistemazione <span class="badge badge-tab badge-yellow">{{ tasksInSistemazione.length }}</span>
             </button>
           </div>
         </div>
+
+        <!-- ====== SEZIONE "IN SPOSTAMENTO" (sempre visibile sopra i tab) ====== -->
+        <div v-if="lottiInMovimento.length > 0" class="in-movimento-section">
+          <div class="in-movimento-header">
+            <span class="movimento-dot-anim"></span>
+            In Spostamento
+            <span class="col-count-sm">{{ lottiInMovimento.length }}</span>
+          </div>
+          <div
+            v-for="mov in lottiInMovimento"
+            :key="'mov-'+mov.lotto.id"
+            class="movimento-card"
+            :class="{'movimento-selected': lottoDaAssegnare?.id === mov.lotto.id}"
+            @click="selezionaLotto(mov.lotto); quantitaSelezionata = Math.min(mov.qtaMossa, mov.lotto.quantita)"
+          >
+            <div class="flex justify-between items-center mb-1">
+              <strong class="text-sm">Lotto #{{ mov.lotto.id }}</strong>
+              <span class="badge badge-arancio">{{ mov.qtaMossa }} pz</span>
+            </div>
+            <span class="movimento-nome-prod">{{ getNomeProdotto(mov.lotto.idProdotto) }}</span>
+            <div class="movimento-from-label">
+              <svg class="icon-tiny" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
+              Da: {{ mov.fromSlotLabel }}
+            </div>
+            <p v-if="lottoDaAssegnare?.id === mov.lotto.id" class="movimento-hint">
+              ✅ Selezionato — clicca uno slot per depositare qui.
+            </p>
+            <p v-else class="movimento-hint-idle">Clicca per selezionare e riposizionare.</p>
+          </div>
+        </div>
+        <!-- ================================================================= -->
 
         <div class="batch-list" v-if="activeTab === 'da_sistemare'">
           <div v-for="lotto in lottiDaSistemareFiltrati" :key="lotto.id" class="batch-card" :class="{'selected': lottoDaAssegnare?.id === lotto.id}" @click="selezionaLotto(lotto)">
@@ -861,19 +1048,91 @@ onMounted(async () => {
           <div v-if="lottiDaSistemareFiltrati.length === 0" class="empty-list">Nessun lotto in attesa per questo reparto.</div>
         </div>
 
-        <div class="batch-list" v-else-if="activeTab === 'in_sistemazione'">
-          <div v-for="lotto in lottiInSistemazioneFiltrati" :key="'insys-'+lotto.id" class="batch-card in-lavorazione">
-            <div class="batch-info">
-              <div class="flex justify-between items-start">
-                <strong>Lotto #{{ lotto.id }}</strong>
-                <span class="badge bg-yellow-100 text-yellow-800 font-bold">In volo: {{ lotto.qtaInSistemazione }} pz</span>
-              </div>
-              
-              <span class="text-gray-600 font-bold text-lg mt-1 block">{{ getNomeProdotto(lotto.idProdotto) }}</span>
-              <p class="text-sm text-gray-500 mt-2">Questa merce è stata assegnata a uno o più task ed è attualmente in lavorazione da parte di un operatore.</p>
+        <div class="batch-list sistemi-list" v-else-if="activeTab === 'in_sistemazione'">
+
+          <!-- EMPTY STATE -->
+          <div v-if="tasksInSistemazione.length === 0" class="empty-list">Nessun task in corso per questo reparto.</div>
+
+          <!-- SPOSTAMENTI -->
+          <template v-if="tasksSpostamento.length > 0">
+            <div class="sistemi-group-label">
+              <span class="sistemi-dot sistemi-dot-sposta"></span>
+              Spostamenti <span class="sistemi-count">{{ tasksSpostamento.length }}</span>
             </div>
-          </div>
-          <div v-if="lottiInSistemazioneFiltrati.length === 0" class="empty-list">Nessun task in corso per questo reparto.</div>
+            <div v-for="t in tasksSpostamento" :key="'sp-'+t.taskId" class="sistemi-card sistemi-card-sposta">
+              <div class="sistemi-card-top">
+                <span class="font-bold text-sm">Lotto #{{ t.idLotto }}</span>
+                <span class="badge sistemi-badge-sposta">{{ t.quantita }} pz</span>
+              </div>
+              <span class="sistemi-nome-prod">{{ t.nomeProdotto }}</span>
+              <div class="sistemi-route">
+                <div class="sistemi-route-step">
+                  <svg class="icon-tiny" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
+                  <span>{{ t.labelScaffaleInizio || '—' }}</span>
+                </div>
+                <div class="sistemi-route-arrow">↓</div>
+                <div class="sistemi-route-step">
+                  <svg class="icon-tiny" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
+                  <span>{{ t.labelScaffaleFine || '—' }}</span>
+                </div>
+              </div>
+              <div class="sistemi-dipendente">
+                <svg class="icon-tiny" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                {{ t.nomeDipendente }}
+              </div>
+            </div>
+          </template>
+
+          <!-- PRELIEVI -->
+          <template v-if="tasksPrelievo.length > 0">
+            <div class="sistemi-group-label">
+              <span class="sistemi-dot sistemi-dot-preleva"></span>
+              Prelievi <span class="sistemi-count">{{ tasksPrelievo.length }}</span>
+            </div>
+            <div v-for="t in tasksPrelievo" :key="'pr-'+t.taskId" class="sistemi-card sistemi-card-preleva">
+              <div class="sistemi-card-top">
+                <span class="font-bold text-sm">Lotto #{{ t.idLotto }}</span>
+                <span class="badge sistemi-badge-preleva">{{ t.quantita }} pz</span>
+              </div>
+              <span class="sistemi-nome-prod">{{ t.nomeProdotto }}</span>
+              <div class="sistemi-route">
+                <div class="sistemi-route-step">
+                  <svg class="icon-tiny" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
+                  <span>{{ t.labelScaffaleInizio || '—' }}</span>
+                </div>
+              </div>
+              <div class="sistemi-dipendente">
+                <svg class="icon-tiny" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                {{ t.nomeDipendente }}
+              </div>
+            </div>
+          </template>
+
+          <!-- DEPOSITI -->
+          <template v-if="tasksDeposito.length > 0">
+            <div class="sistemi-group-label">
+              <span class="sistemi-dot sistemi-dot-deposita"></span>
+              Depositi <span class="sistemi-count">{{ tasksDeposito.length }}</span>
+            </div>
+            <div v-for="t in tasksDeposito" :key="'dep-'+t.taskId" class="sistemi-card sistemi-card-deposita">
+              <div class="sistemi-card-top">
+                <span class="font-bold text-sm">Lotto #{{ t.idLotto }}</span>
+                <span class="badge sistemi-badge-deposita">{{ t.quantita }} pz</span>
+              </div>
+              <span class="sistemi-nome-prod">{{ t.nomeProdotto }}</span>
+              <div class="sistemi-route">
+                <div class="sistemi-route-step">
+                  <svg class="icon-tiny" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
+                  <span>{{ t.labelScaffaleFine || '—' }}</span>
+                </div>
+              </div>
+              <div class="sistemi-dipendente">
+                <svg class="icon-tiny" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                {{ t.nomeDipendente }}
+              </div>
+            </div>
+          </template>
+
         </div>
 
         <div class="panel-footer" v-if="nuoviAssegnamenti.length > 0 || modifichePendenti.length > 0">
@@ -889,86 +1148,119 @@ onMounted(async () => {
     <div v-if="cellaDettaglioAttiva" class="modal-overlay" @click="chiudiDettaglioCella">
       <div class="modal-content-large" @click.stop>
         <div class="modal-header">
-          <h3>Dettaglio Slot <span class="text-blue">R{{ cellaDettaglioAttiva.riga + 1 }} - C{{ cellaDettaglioAttiva.colonna + 1 }}</span></h3>
+          <div class="modal-header-info">
+            <h3>Dettaglio Slot <span class="text-blue">R{{ cellaDettaglioAttiva.riga + 1 }} - C{{ cellaDettaglioAttiva.colonna + 1 }}</span></h3>
+            <div class="spazio-pill" :class="{'spazio-critico': cellaDettaglioAttiva.spazioOccupato > 90}">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width:14px;height:14px"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
+              Spazio: {{ cellaDettaglioAttiva.spazioOccupato }}/{{ MAX_SPAZIO_CELLA }}
+            </div>
+          </div>
           <button @click="chiudiDettaglioCella" class="btn-close-modal">
             <svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
           </button>
         </div>
-        <div class="modal-body">
-          <div class="info-row highlight-row">
-            <span class="info-label">Spazio Utilizzato:</span>
-            <span class="info-value" :class="{'text-red-500': cellaDettaglioAttiva.spazioOccupato > 90}">{{ cellaDettaglioAttiva.spazioOccupato }} / {{ MAX_SPAZIO_CELLA }}</span>
-          </div>
-          <h4 class="mt-4 mb-2 font-bold text-gray-700">Lotti presenti nello slot:</h4>
-          
-          <div class="lotti-lista-modal">
-            <div v-for="item in cellaDettaglioAttiva.elementi" :key="item.idBatchProdotti" class="lotto-modal-item" :class="{'border-l-4 border-yellow-500': item.isNuovo, 'border-l-4 border-blue-500': !item.isNuovo}">
-              
-              <div class="flex justify-between items-center mb-1">
-                <span class="font-bold">Lotto #{{ item.idBatchProdotti }}</span>
-                <span class="badge" :class="item.isNuovo ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'">
-                  {{ item.isNuovo ? 'Nuovo' : 'Salvato' }}
-                </span>
-              </div>
-              
-              <span class="text-blue font-bold text-lg block">{{ item.prodotto ? item.prodotto.nome : 'Sconosciuto' }}</span>
-              
-              <div class="dettagli-tecnici-modal mt-2">
-                <div class="dettaglio-item" v-if="item.batch && (item.batch.scadenza || item.batch.dataScadenza)">
-                  <svg class="icon-tiny" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                  Scadenza: {{ formatData(item.batch.scadenza || item.batch.dataScadenza) }}
-                </div>
-                <div class="dettaglio-item">
-                  <svg class="icon-tiny" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"></path></svg>
-                  Peso Un.: {{ item.prodotto?.pesoUnitario }} kg
-                </div>
-                <div class="dettaglio-item">
-                  <svg class="icon-tiny" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
-                  Spazio Un.: {{ item.prodotto?.spazioUnitario }}/{{ MAX_SPAZIO_CELLA }}
-                </div>
-              </div>
 
-              <div class="etichette-container mt-1" v-if="item.prodotto && getEtichetteProdotto(item.prodotto.id).length > 0">
-                <span v-for="et in getEtichetteProdotto(item.prodotto.id)" :key="et.id" class="etichetta-pill">
-                  {{ et.nome }}
-                </span>
-              </div>
-
-              <div class="totali-cella mt-3">
-                <span>In cella: <strong>{{ item.qta }} pz</strong></span>
-                <span>Peso tot: <strong>{{ Math.round(item.qta * (item.prodotto?.pesoUnitario || 0) * 10) / 10 }} kg</strong></span>
-                <span>Spazio tot: <strong>{{ Math.round(item.qta * (item.prodotto?.spazioUnitario || 1) * 10) / 10 }}</strong></span>
-              </div>
-
-              <div class="removal-controls mt-3">
-                <label>Rimuovi:</label>
-                <div class="flex gap-2">
-                  <input type="number" v-model.number="item.qtaRimuovere" min="1" :max="item.qta" class="input-remove" />
-                  <button @click="rimuoviDaCella(item)" class="btn-remove-sm">Togli</button>
-                </div>
-              </div>
-              
+        <div class="modal-two-col">
+          <!-- COLONNA SINISTRA: Lotti presenti -->
+          <div class="modal-col">
+            <div class="modal-col-header modal-col-header-left">
+              <span class="col-dot col-dot-blue"></span>
+              Lotti Presenti
+              <span class="col-count">{{ cellaDettaglioAttiva.elementi.length }}</span>
             </div>
-          </div>
-          
-          <div v-if="cellaDettaglioAttiva.inArrivo.length > 0" class="mt-4 border-t pt-4 border-gray-200">
-            <h4 class="text-sm font-bold text-gray-700 uppercase tracking-wide mb-2 flex items-center gap-2">
-              <span class="inline-block w-2 h-2 rounded-full bg-yellow-400"></span>
-              Prodotti da sistemare (Task Attivi)
-            </h4>
-            <div v-for="item in cellaDettaglioAttiva.inArrivo" :key="'arr-'+item.taskId" class="item-dettaglio-card border-yellow-200 bg-yellow-50 mb-3">
-              <div class="flex justify-between items-start mb-1">
-                <span class="badge badge-yellow">Arrivo: {{ item.qta }} pz</span>
-                <span class="text-xs text-gray-500">Task #{{ item.taskId }}</span>
-              </div>
-              <span class="text-yellow-800 font-bold text-lg block">{{ item.prodotto ? item.prodotto.nome : 'Sconosciuto' }}</span>
-              <div class="text-sm text-yellow-700 mt-1">
-                In attesa che l'operatore completi il piazzamento per il Lotto #{{ item.batch?.id }}.
+            <div class="modal-col-body">
+              <div v-if="cellaDettaglioAttiva.elementi.length === 0" class="col-empty">Nessun lotto fisico in questo slot.</div>
+              <div v-for="item in cellaDettaglioAttiva.elementi" :key="item.idBatchProdotti" class="lotto-modal-item" :class="{'border-l-4 border-yellow-500': item.isNuovo, 'border-l-4 border-blue-500': !item.isNuovo}">
+
+                <div class="flex justify-between items-center mb-1">
+                  <span class="font-bold">Lotto #{{ item.idBatchProdotti }}</span>
+                  <span class="badge" :class="item.isNuovo ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'">
+                    {{ item.isNuovo ? 'Nuovo' : 'Salvato' }}
+                  </span>
+                </div>
+
+                <span class="text-blue font-bold text-lg block">{{ item.prodotto ? item.prodotto.nome : 'Sconosciuto' }}</span>
+
+                <div class="dettagli-tecnici-modal mt-2">
+                  <div class="dettaglio-item" v-if="item.batch && (item.batch.scadenza || item.batch.dataScadenza)">
+                    <svg class="icon-tiny" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    Scad: {{ formatData(item.batch.scadenza || item.batch.dataScadenza) }}
+                  </div>
+                  <div class="dettaglio-item">
+                    <svg class="icon-tiny" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"></path></svg>
+                    Peso: {{ item.prodotto?.pesoUnitario }} kg/pz
+                  </div>
+                </div>
+
+                <div class="etichette-container mt-1" v-if="item.prodotto && getEtichetteProdotto(item.prodotto.id).length > 0">
+                  <span v-for="et in getEtichetteProdotto(item.prodotto.id)" :key="et.id" class="etichetta-pill">{{ et.nome }}</span>
+                </div>
+
+                <div class="totali-cella mt-2">
+                  <span>In cella: <strong>{{ item.qta }} pz</strong></span>
+                  <span>Spazio: <strong>{{ Math.round(item.qta * (item.prodotto?.spazioUnitario || 1) * 10) / 10 }}</strong></span>
+                </div>
+
+                <div class="removal-controls mt-2">
+                  <label>Rimuovi:</label>
+                  <div class="flex gap-2">
+                    <input type="number" v-model.number="item.qtaRimuovere" min="1" :max="item.qta" class="input-remove" />
+                    <button @click="rimuoviDaCella(item)" class="btn-remove-sm">Togli</button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-          
-          <div v-if="cellaDettaglioAttiva.elementi.length === 0 && cellaDettaglioAttiva.inArrivo.length === 0" class="text-center text-gray-500 py-4">Slot vuoto.</div>
+
+          <!-- COLONNA DESTRA: In Transito (arrivo + uscita) -->
+          <div class="modal-col modal-col-right">
+            <div class="modal-col-header modal-col-header-right">
+              <span class="col-dot col-dot-orange"></span>
+              In Transito
+              <span class="col-count">{{ cellaDettaglioAttiva.inArrivo.length + cellaDettaglioAttiva.inUscita.length }}</span>
+            </div>
+            <div class="modal-col-body">
+              <div v-if="cellaDettaglioAttiva.inArrivo.length === 0 && cellaDettaglioAttiva.inUscita.length === 0" class="col-empty">Nessun task attivo su questo slot.</div>
+
+              <!-- In Arrivo -->
+              <template v-if="cellaDettaglioAttiva.inArrivo.length > 0">
+                <div class="transito-section-label">
+                  <span class="inline-block w-2 h-2 rounded-full bg-yellow-400" style="flex-shrink:0"></span>
+                  In Deposito
+                </div>
+                <div v-for="item in cellaDettaglioAttiva.inArrivo" :key="'arr-'+item.taskId" class="item-dettaglio-card border-yellow-200 bg-yellow-50 mb-2">
+                  <div class="flex justify-between items-start mb-1">
+                    <span class="badge badge-yellow">+{{ item.qta }} pz</span>
+                    <span class="text-xs text-gray-500">Task #{{ item.taskId }}</span>
+                  </div>
+                  <span class="text-yellow-800 font-bold block">{{ item.prodotto ? item.prodotto.nome : 'Sconosciuto' }}</span>
+                  <div class="text-xs text-yellow-700 mt-1">Lotto #{{ item.batch?.id }} — in lavorazione.</div>
+                  <div class="mt-2 flex justify-end">
+                    <button @click="annullaTask(item.taskId)" class="btn-cancel-sm">Annulla Task</button>
+                  </div>
+                </div>
+              </template>
+
+              <!-- In Uscita -->
+              <template v-if="cellaDettaglioAttiva.inUscita.length > 0">
+                <div class="transito-section-label" :class="{ 'mt-3': cellaDettaglioAttiva.inArrivo.length > 0 }">
+                  <span class="inline-block w-2 h-2 rounded-full bg-red-400" style="flex-shrink:0"></span>
+                  In Prelievo
+                </div>
+                <div v-for="item in cellaDettaglioAttiva.inUscita" :key="'usc-'+item.taskId" class="item-dettaglio-card border-red-200 bg-red-50 mb-2">
+                  <div class="flex justify-between items-start mb-1">
+                    <span class="badge bg-red-100 text-red-800">-{{ item.qta }} pz</span>
+                    <span class="text-xs text-gray-500">Task #{{ item.taskId }}</span>
+                  </div>
+                  <span class="text-red-800 font-bold block">{{ item.prodotto ? item.prodotto.nome : 'Sconosciuto' }}</span>
+                  <div class="text-xs text-red-700 mt-1">Lotto #{{ item.batch?.id }} — in lavorazione.</div>
+                  <div class="mt-2 flex justify-end">
+                    <button @click="annullaTask(item.taskId)" class="btn-cancel-sm">Annulla Task</button>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1028,13 +1320,30 @@ onMounted(async () => {
 .slot-inarrivo { background-color: #eab308; border-color: #ca8a04; opacity: 0.8; }
 .slot-inuscita { background-color: #ef4444; border-color: #b91c1c; opacity: 0.8; }
 .modal-content { background: white; border-radius: 12px; width: 420px; max-width: 90%; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); overflow: hidden; border: 1px solid #cbd5e1;}
-.modal-content-large { background: white; border-radius: 12px; width: 500px; max-width: 95%; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); overflow: hidden; border: 1px solid #cbd5e1;}
-.modal-header { background: #f8fafc; padding: 15px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
-.modal-header h3 { margin: 0; color: #0f172a; font-size: 1.2rem; font-weight: 800;}
+.modal-content-large { background: white; border-radius: 12px; width: 820px; max-width: 96vw; max-height: 90vh; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15); overflow: hidden; border: 1px solid #cbd5e1; display: flex; flex-direction: column;}
+.modal-header { background: #f8fafc; padding: 15px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+.modal-header-info { display: flex; align-items: center; gap: 14px; }
+.modal-header h3 { margin: 0; color: #0f172a; font-size: 1.1rem; font-weight: 800;}
+.spazio-pill { display: flex; align-items: center; gap: 5px; background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; border-radius: 20px; padding: 3px 10px; font-size: 0.78rem; font-weight: 700; }
+.spazio-pill.spazio-critico { background: #fee2e2; color: #dc2626; border-color: #fca5a5; }
 .text-blue { color: #3b82f6; }
-.btn-close-modal { background: transparent; border: none; color: #64748b; cursor: pointer; transition: 0.2s; padding: 4px; display: flex; justify-content: center; align-items: center; }
+.btn-close-modal { background: transparent; border: none; color: #64748b; cursor: pointer; transition: 0.2s; padding: 4px; display: flex; justify-content: center; align-items: center; flex-shrink: 0; }
 .btn-close-modal:hover { color: #ef4444; background: #fee2e2; border-radius: 4px; }
-.modal-body { padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+/* Layout due colonne del modal */
+.modal-two-col { display: grid; grid-template-columns: 1fr 1fr; flex: 1; min-height: 0; overflow: hidden; }
+.modal-col { display: flex; flex-direction: column; min-height: 0; }
+.modal-col-right { border-left: 1px solid #e2e8f0; background: #fafbfc; }
+.modal-col-header { display: flex; align-items: center; gap: 8px; padding: 10px 16px; font-size: 0.78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #475569; border-bottom: 1px solid #e2e8f0; flex-shrink: 0; }
+.modal-col-header-left { background: #f8fafc; color: #1e40af; }
+.modal-col-header-right { background: #fffbf0; color: #92400e; }
+.col-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.col-dot-blue { background: #3b82f6; }
+.col-dot-orange { background: #f59e0b; }
+.col-count { margin-left: auto; background: rgba(0,0,0,0.06); border-radius: 10px; padding: 1px 7px; font-size: 0.75rem; }
+.modal-col-body { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.col-empty { color: #94a3b8; font-size: 0.85rem; text-align: center; padding: 24px 12px; font-style: italic; }
+.transito-section-label { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
+.modal-body { padding: 20px; display: flex; flex-direction: column; gap: 12px; max-height: 70vh; overflow-y: auto; }
 .info-row { display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; border-bottom: 1px dashed #e2e8f0; }
 .info-row:last-child { border-bottom: none; padding-bottom: 0; }
 .highlight-row { background: #f1f5f9; padding: 10px; border-radius: 6px; border: none;}
@@ -1102,8 +1411,46 @@ onMounted(async () => {
 .badge-yellow { background: #fef08a; color: #854d0e; }
 .in-lavorazione { border-left-color: #eab308 !important; opacity: 0.9;}
 
+/* --- SEZIONE IN SISTEMAZIONE: card per tipo task --- */
+.sistemi-list { padding: 10px 12px; }
+.sistemi-group-label { display: flex; align-items: center; gap: 7px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; padding: 8px 4px 4px; }
+.sistemi-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.sistemi-dot-sposta  { background: #8b5cf6; }
+.sistemi-dot-preleva { background: #ef4444; }
+.sistemi-dot-deposita{ background: #10b981; }
+.sistemi-count { background: rgba(0,0,0,0.06); border-radius: 8px; padding: 1px 6px; font-size: 0.7rem; margin-left: auto; }
+.sistemi-card { border-radius: 8px; padding: 10px 12px; margin-bottom: 6px; border: 1px solid; }
+.sistemi-card-sposta  { background: #f5f3ff; border-color: #ddd6fe; }
+.sistemi-card-preleva { background: #fff1f2; border-color: #fecdd3; }
+.sistemi-card-deposita{ background: #f0fdf4; border-color: #bbf7d0; }
+.sistemi-card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; }
+.sistemi-nome-prod { display: block; font-weight: 700; font-size: 0.88rem; color: #1e293b; margin-bottom: 6px; }
+.sistemi-badge-sposta  { background: #ede9fe; color: #6d28d9; font-size: 0.7rem; font-weight: 800; padding: 2px 7px; border-radius: 4px; }
+.sistemi-badge-preleva { background: #fee2e2; color: #b91c1c; font-size: 0.7rem; font-weight: 800; padding: 2px 7px; border-radius: 4px; }
+.sistemi-badge-deposita{ background: #dcfce7; color: #15803d; font-size: 0.7rem; font-weight: 800; padding: 2px 7px; border-radius: 4px; }
+.sistemi-route { display: flex; flex-direction: column; gap: 2px; margin-bottom: 6px; padding: 5px 8px; background: rgba(255,255,255,0.6); border-radius: 5px; }
+.sistemi-route-step { display: flex; align-items: center; gap: 5px; font-size: 0.72rem; color: #334155; font-weight: 600; font-family: monospace; }
+.sistemi-route-arrow { font-size: 0.7rem; color: #94a3b8; padding-left: 14px; line-height: 1; }
+.sistemi-dipendente { display: flex; align-items: center; gap: 5px; font-size: 0.72rem; color: #475569; font-weight: 600; padding-top: 5px; border-top: 1px dashed rgba(0,0,0,0.08); }
+
 .panel-header { padding: 15px 20px; border-bottom: 1px solid #e2e8f0; }
 .panel-header h3 { margin: 0; font-size: 1.1rem; color: #1e293b; }
+
+/* --- SEZIONE IN SPOSTAMENTO --- */
+.in-movimento-section { background: linear-gradient(135deg, #fff7ed 0%, #fffbf0 100%); border-top: 2px solid #fb923c; border-bottom: 2px solid #fed7aa; flex-shrink: 0; }
+.in-movimento-header { display: flex; align-items: center; gap: 8px; padding: 8px 16px; font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: #c2410c; }
+.movimento-dot-anim { width: 8px; height: 8px; border-radius: 50%; background: #f97316; animation: pulse 1.1s infinite; flex-shrink: 0; box-shadow: 0 0 0 0 rgba(249,115,22,0.5); }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(249,115,22,0.5); } 70% { box-shadow: 0 0 0 6px rgba(249,115,22,0); } 100% { box-shadow: 0 0 0 0 rgba(249,115,22,0); } }
+.col-count-sm { margin-left: auto; background: rgba(249,115,22,0.15); color: #c2410c; border-radius: 10px; padding: 1px 7px; font-size: 0.72rem; font-weight: 800; }
+.movimento-card { padding: 10px 14px; cursor: pointer; border-bottom: 1px solid #fed7aa; transition: background 0.15s ease; }
+.movimento-card:last-child { border-bottom: none; }
+.movimento-card:hover { background: #ffedd5; }
+.movimento-card.movimento-selected { background: #fff3e0; border-left: 3px solid #f97316; padding-left: 11px; }
+.movimento-nome-prod { font-weight: 700; color: #9a3412; font-size: 0.88rem; display: block; margin: 2px 0 5px; }
+.movimento-from-label { display: flex; align-items: center; gap: 4px; font-size: 0.7rem; color: #78350f; opacity: 0.75; }
+.movimento-hint { font-size: 0.75rem; color: #16a34a; font-weight: 700; margin: 5px 0 0; }
+.movimento-hint-idle { font-size: 0.7rem; color: #9a3412; opacity: 0.6; margin: 4px 0 0; font-style: italic; }
+.badge-arancio { background: #fed7aa; color: #9a3412; font-size: 0.7rem; font-weight: 800; padding: 2px 7px; border-radius: 4px; }
 .batch-list { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 8px; }
 .batch-card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; cursor: pointer; transition: 0.2s; background: white; }
 .batch-card:hover { border-color: #94a3b8; }
@@ -1179,4 +1526,7 @@ onMounted(async () => {
   50% { box-shadow: 0 0 25px rgba(236, 72, 153, 0.8) inset, 0 0 15px rgba(236, 72, 153, 0.6); }
   100% { box-shadow: 0 0 15px rgba(236, 72, 153, 0.6) inset, 0 0 5px rgba(236, 72, 153, 0.2); }
 }
+
+.btn-cancel-sm { background-color: white; color: #ef4444; border: 1px solid #fca5a5; padding: 4px 10px; font-size: 0.8rem; font-weight: bold; border-radius: 4px; cursor: pointer; transition: 0.2s; }
+.btn-cancel-sm:hover { background-color: #fee2e2; border-color: #ef4444; }
 </style>

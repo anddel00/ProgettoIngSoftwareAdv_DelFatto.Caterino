@@ -60,12 +60,6 @@ const routes = [
         name: 'GestioneTurni',
         component: GestioneTurni
     },
-    // Modifica queste rotte nel tuo router.js
-    {
-        path: '/MappaOverview',
-        name: 'MappaOverview',
-        component: () => import('./views/MappaOverview.vue') // La nuova pagina che creeremo
-    },
     {
         path: '/Mappa/reparto/:id', // Parametro dinamico per l'ID del reparto
         name: 'MappaDettaglio',

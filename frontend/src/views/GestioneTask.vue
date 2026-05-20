@@ -121,11 +121,41 @@ const creaTask = async () => {
   }
 }
 
+const annullaTask = async (taskId) => {
+  if (confirm(`Sei sicuro di voler annullare il task #${taskId}? Questa operazione non può essere annullata.`)) {
+    try {
+      await api.delete(`/api/tasks/${taskId}/annulla`)
+      // Rimuovi localmente per evitare un ricaricamento completo o aspetta il websocket
+      tuttiTask.value = tuttiTask.value.filter(t => t.id !== taskId)
+      // Per sicurezza ricarichiamo (in caso il WS non sia istantaneo)
+      await fetchTuttiTask()
+    } catch (e) {
+      alert(e.response?.data || "Errore durante l'annullamento del task.")
+    }
+  }
+}
+
 const getStatoClass = (stato) => {
   if (stato === 'DA_FARE')   return 'stato-da-fare'
   if (stato === 'IN_CARICO') return 'stato-in-carico'
   if (stato === 'COMPLETATO') return 'stato-completato'
   return ''
+}
+
+// Helper: costruisce il label leggibile di uno slot da idScaffale + coordinate
+const labelScaffale = (idScaffale, y, x, z) => {
+  if (!idScaffale) return null
+  return `S${idScaffale} · R${y + 1} C${x + 1} P${z + 1}`
+}
+
+// Percorso contestuale per tipo di task
+const getPercorso = (task) => {
+  const inizio = labelScaffale(task.idScaffaleInizio, task.vecchiaY, task.vecchiaX, task.vecchiaZ)
+  const fine   = labelScaffale(task.idScaffaleFine,   task.nuovaY,  task.nuovaX,  task.nuovaZ)
+  if (task.tipoTask === 'SPOSTAMENTO') return { da: inizio || '—', a: fine || '—', tipo: 'sposta' }
+  if (task.tipoTask === 'PRELIEVO')    return { da: inizio || '—', a: 'In attesa', tipo: 'preleva' }
+  if (task.tipoTask === 'DEPOSITO')    return { da: 'In attesa', a: fine || '—',   tipo: 'deposita' }
+  return { da: '—', a: '—', tipo: '' }
 }
 </script>
 
@@ -214,19 +244,33 @@ const getStatoClass = (stato) => {
             <table class="glass-table">
               <thead>
               <tr>
-                <th>ID</th><th>Descrizione</th><th>Tipo</th><th>Quantità</th><th>Assegnato a</th><th>Stato</th>
+                <th>ID</th><th>Tipo</th><th>Qta</th><th>Percorso</th><th>Reparto</th><th>Assegnato a</th><th>Stato</th><th class="text-right">Azioni</th>
               </tr>
               </thead>
               <tbody>
               <tr v-for="task in taskFiltrati" :key="task.id">
                 <td class="id-cell">#TSK-{{ task.id }}</td>
-                <td class="desc-cell">{{ task.descrizione }}</td>
                 <td>
                     <span class="task-type" :class="task.tipoTask === 'PRELIEVO' ? 'pickup' : task.tipoTask === 'DEPOSITO' ? 'dropoff' : 'move'">
                       {{ task.tipoTask }}
                     </span>
                 </td>
                 <td><strong>{{ task.quantita }}</strong></td>
+
+                <!-- COLONNA PERCORSO -->
+                <td class="route-cell">
+                  <div class="route-wrap" :class="'route-' + getPercorso(task).tipo">
+                    <span class="route-slot route-from">{{ getPercorso(task).da }}</span>
+                    <svg class="route-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+                    <span class="route-slot route-to" :class="{'route-attesa': getPercorso(task).a === 'In attesa' || getPercorso(task).da === 'In attesa'}">{{ getPercorso(task).a }}</span>
+                  </div>
+                </td>
+
+                <!-- COLONNA REPARTO -->
+                <td>
+                  <span v-if="task.nomeReparto" class="reparto-badge">{{ task.nomeReparto }}</span>
+                  <span v-else class="text-muted">&mdash;</span>
+                </td>
 
                 <td class="operator-cell">
                   <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
@@ -236,6 +280,13 @@ const getStatoClass = (stato) => {
                     <span class="stato-badge" :class="getStatoClass(task.statoTask)">
                       {{ task.statoTask?.replace('_', ' ') }}
                     </span>
+                </td>
+                <td class="action-cell">
+                  <button v-if="task.statoTask !== 'COMPLETATO' && task.statoTask !== 'ANNULLATO'" 
+                          @click="annullaTask(task.id)" 
+                          class="btn-delete-glass" title="Annulla Task">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                  </button>
                 </td>
               </tr>
               </tbody>
@@ -488,6 +539,25 @@ const getStatoClass = (stato) => {
 .stato-da-fare { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;}
 .stato-in-carico { background: #dbeafe; color: #1d4ed8; border: 1px solid #bfdbfe;}
 .stato-completato { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0;}
+
+.action-cell { text-align: right; }
+.btn-delete-glass { background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); padding: 8px; border-radius: 8px; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; }
+.btn-delete-glass:hover { background: #ef4444; color: white; transform: translateY(-2px); box-shadow: 0 4px 10px rgba(239, 68, 68, 0.3); }
+.btn-delete-glass svg { width: 16px; height: 16px; }
+
+/* --- COLONNA PERCORSO --- */
+.route-cell { min-width: 220px; }
+.route-wrap { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 5px 8px; border-radius: 8px; width: fit-content; }
+.route-sposta  { background: rgba(139,92,246,0.08); border: 1px solid rgba(139,92,246,0.15); }
+.route-preleva { background: rgba(239,68,68,0.07);  border: 1px solid rgba(239,68,68,0.15); }
+.route-deposita{ background: rgba(16,185,129,0.07); border: 1px solid rgba(16,185,129,0.15); }
+.route-slot { font-family: 'Courier New', monospace; font-size: 11px; color: #334155; padding: 2px 6px; background: rgba(255,255,255,0.7); border-radius: 4px; white-space: nowrap; }
+.route-attesa { color: #94a3b8 !important; background: #f8fafc !important; font-style: italic; }
+.route-arrow { width: 12px; height: 12px; color: #94a3b8; flex-shrink: 0; }
+
+/* --- BADGE REPARTO --- */
+.reparto-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; background: rgba(99,102,241,0.1); color: #4338ca; border: 1px solid rgba(99,102,241,0.2); white-space: nowrap; }
+.text-muted { color: #94a3b8; }
 
 .empty-state-glass { padding: 60px 0; color: #64748b; text-align: center; display: flex; flex-direction: column; align-items: center; }
 .empty-state-glass svg { width: 48px; height: 48px; margin-bottom: 16px; opacity: 0.5; }

@@ -110,13 +110,37 @@ public class TaskController {
 
             for (TaskDip td : assegnazioniCompletate) {
                 String nomeCompleto = td.getDipendente().getNome() + " " + td.getDipendente().getCognome();
-                storico.add(new AdminStoricoTaskDTO(
+                AdminStoricoTaskDTO dto = new AdminStoricoTaskDTO(
                         td.getTask().getId(),
                         td.getTask().getDescrizione(),
                         td.getTask().getTipo_task(),
                         td.getTask().getQta_spostata(),
                         nomeCompleto
-                ));
+                );
+
+                // Popolamento campi percorso (scaffale partenza + destinazione + coordinate)
+                if (td.getTask().getScaffale_inizio() != null) {
+                    dto.setIdScaffaleInizio(td.getTask().getScaffale_inizio().getId());
+                }
+                if (td.getTask().getScaffale_fine() != null) {
+                    dto.setIdScaffaleFine(td.getTask().getScaffale_fine().getId());
+                }
+                dto.setVecchiaX(td.getTask().getVecchia_x());
+                dto.setVecchiaY(td.getTask().getVecchia_y());
+                dto.setVecchiaZ(td.getTask().getVecchia_z());
+                dto.setNuovaX(td.getTask().getNuova_x());
+                dto.setNuovaY(td.getTask().getNuova_y());
+                dto.setNuovaZ(td.getTask().getNuova_z());
+
+                // Reparto: scaffale_inizio ha priorità, fallback su scaffale_fine
+                if (td.getTask().getScaffale_inizio() != null && td.getTask().getScaffale_inizio().getReparto() != null) {
+                    dto.setNomeReparto(td.getTask().getScaffale_inizio().getReparto().getNome());
+                } else if (td.getTask().getScaffale_fine() != null && td.getTask().getScaffale_fine().getReparto() != null) {
+                    dto.setNomeReparto(td.getTask().getScaffale_fine().getReparto().getNome());
+                }
+
+                storico.add(dto);
+
             }
 
             return ResponseEntity.ok(storico);
@@ -138,5 +162,21 @@ public class TaskController {
         }
     }
 
+
+    // ==========================================
+    // 7. ANNULLA UN TASK ATTIVO (CANCELLAZIONE)
+    // DELETE /api/tasks/{id}/annulla
+    // ==========================================
+    @DeleteMapping("/{id}/annulla")
+    public ResponseEntity<?> annullaTask(@PathVariable Long id) {
+        try {
+            taskService.annullaTask(id);
+            return ResponseEntity.ok("Task annullato e rimosso con successo.");
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Errore nell'annullamento del task.");
+        }
+    }
 
 }
