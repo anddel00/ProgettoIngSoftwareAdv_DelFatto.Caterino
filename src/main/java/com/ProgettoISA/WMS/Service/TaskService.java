@@ -196,6 +196,15 @@ public class TaskService {
     }
 
     // ==========================================
+    // 2A-BIS. OTTIENI TASK ATTIVI FILTRATI PER REPARTO (Per MappaMagazzino lazy loading)
+    // ==========================================
+    public List<TaskDTO> getTaskAttiviPerReparto(Long idReparto) {
+        return taskDipRepository.findTaskAttiviPerReparto(idReparto).stream()
+                .map(this::convertiInDTO)
+                .collect(Collectors.toList());
+    }
+
+    // ==========================================
     // 2B. OTTIENI TUTTI I TASK (Per StoricoAdmin.vue)
     // ==========================================
     public List<TaskDTO> getTuttiTask() {

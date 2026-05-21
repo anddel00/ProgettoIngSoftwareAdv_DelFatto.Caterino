@@ -27,12 +27,28 @@ public class BatchScaffaleService {
         this.batchProdottiRepository = batchProdottiRepository;
     }
 
+    @Transactional(readOnly = true)
     public List<BatchScaffaleDTO> getTuttiIBatchScaffali() {
         List<BatchScaffale> batchScaffali = batchScaffaleRepository.findAll();
         return batchScaffali.stream().map(bs -> new BatchScaffaleDTO(
             bs.getId().longValue(),
             bs.getMappa().getId(), 
             bs.getBatch_prodotti().getId(), 
+            bs.getColonna(),
+            bs.getRiga(),
+            bs.getAltezza(),
+            bs.getQta()
+        )).collect(Collectors.toList());
+    }
+
+    // LAZY LOADING: Restituisce solo i BatchScaffale del reparto richiesto
+    @Transactional(readOnly = true)
+    public List<BatchScaffaleDTO> getBatchScaffaliPerReparto(Long idReparto) {
+        List<BatchScaffale> batchScaffali = batchScaffaleRepository.findByMappaRepartoId(idReparto);
+        return batchScaffali.stream().map(bs -> new BatchScaffaleDTO(
+            bs.getId().longValue(),
+            bs.getMappa().getId(),
+            bs.getBatch_prodotti().getId(),
             bs.getColonna(),
             bs.getRiga(),
             bs.getAltezza(),

@@ -31,4 +31,17 @@ public class MappaService {
             m.getOrientamentoScaffale()  
         )).collect(Collectors.toList());
     }
+
+    // LAZY LOADING: Restituisce solo le celle-mappa del reparto richiesto
+    public List<MappaDTO> getMappaPerReparto(Long idReparto) {
+        List<Mappa> entitaMappa = mappaRepository.findByRepartoId(idReparto);
+        return entitaMappa.stream().map(m -> new MappaDTO(
+            m.getId(),
+            m.getX(),
+            m.getY(),
+            m.getScaffale().getId(),
+            m.getReparto().getId(),
+            m.getOrientamentoScaffale()
+        )).collect(Collectors.toList());
+    }
 }

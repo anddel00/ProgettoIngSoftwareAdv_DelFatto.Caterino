@@ -26,5 +26,22 @@ public interface TaskDipRepository extends JpaRepository<TaskDip, Long> {
     @Query("SELECT MAX(td.task.id) FROM TaskDip td WHERE td.dipendente.email = :email AND td.task.stato_task = 'COMPLETATO'")
     Long findMaxCompletedTaskIdByDipendenteEmail(@Param("email") String email);
 
+    // LAZY LOADING: Task attivi che coinvolgono scaffali del reparto specificato
+    // JOIN espliciti su task e scaffali per evitare N+1 lazy loading
+    @Query("""
+        SELECT td FROM TaskDip td
+        JOIN td.task t
+        LEFT JOIN t.scaffale_inizio si
+        LEFT JOIN si.reparto r_inizio
+        LEFT JOIN t.scaffale_fine sf
+        LEFT JOIN sf.reparto r_fine
+        WHERE t.stato_task != 'COMPLETATO'
+        AND (
+            r_inizio.id = :idReparto
+            OR
+            r_fine.id = :idReparto
+        )
+    """)
+    List<TaskDip> findTaskAttiviPerReparto(@Param("idReparto") Long idReparto);
 
 }

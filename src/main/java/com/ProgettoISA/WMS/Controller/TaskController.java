@@ -162,6 +162,19 @@ public class TaskController {
         }
     }
 
+    // ==========================================
+    // 6-BIS. GET /api/tasks/attivi/reparto/{id}
+    // LAZY LOADING: Task attivi che coinvolgono il reparto specificato
+    // ==========================================
+    @GetMapping("/attivi/reparto/{id}")
+    public ResponseEntity<List<TaskDTO>> getTaskAttiviPerReparto(@PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(taskService.getTaskAttiviPerReparto(id));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
 
     // ==========================================
     // 7. ANNULLA UN TASK ATTIVO (CANCELLAZIONE)

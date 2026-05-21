@@ -29,7 +29,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/login").permitAll()
                 .requestMatchers("/api/auth/registrati").permitAll()
-                .requestMatchers("/ws/**").permitAll() // WebSockets
+                .requestMatchers("/ws/**", "/ws-wms/**").permitAll() // WebSockets
                 .anyRequest().authenticated()
             )
             .sessionManagement(session -> session
@@ -43,7 +43,13 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173", "http://127.0.0.1:5173"));
+        // Aggiunto http://localhost e http://127.0.0.1 per il container Docker frontend sulla porta 80
+        configuration.setAllowedOrigins(Arrays.asList(
+            "http://localhost:5173", 
+            "http://127.0.0.1:5173", 
+            "http://localhost", 
+            "http://127.0.0.1"
+        ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With"));
         configuration.setAllowCredentials(true);

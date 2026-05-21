@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import api from '../api';
 import AdminSidebar from '../components/AdminSidebar.vue';
@@ -7,7 +7,8 @@ import AdminSidebar from '../components/AdminSidebar.vue';
 const mappaDati = ref([]);
 const repartiDati = ref([]);
 const scaffaliDati = ref([]);
-const loading = ref(true);
+const loading = ref(true);          // Fase 1: layout base del reparto
+const loadingDettagli = ref(false); // Fase 2: dati pesanti (batch/task)
 const route = useRoute();
 const router = useRouter();
 
@@ -77,6 +78,45 @@ const haPiano = (cella) => {
 const getDatiTecniciScaffale = (idScaffale) => scaffaliDati.value.find(s => Number(s.id) === Number(idScaffale)) || null;
 const getScaffaliPerReparto = (idReparto) => mappaDati.value.filter(cella => Number(cella.idReparto) === Number(idReparto));
 
+// --- MAP INDICIZZATE PER LOOKUP O(1) ---
+// Chiave: "idMappa-altezza-riga-colonna" → array di BatchScaffale in quello slot
+const slotBatchIndex = computed(() => {
+  const map = new Map();
+  for (const bs of batchScaffaliDati.value) {
+    const key = `${bs.idMappa}-${bs.altezza}-${bs.riga}-${bs.colonna}`;
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(bs);
+  }
+  return map;
+});
+
+// Chiave: "idMappa-altezza-riga-colonna" → array di task in arrivo su quello slot
+const taskIngressoIndex = computed(() => {
+  const map = new Map();
+  for (const task of taskAttiviDati.value) {
+    if ((task.tipoTask === 'DEPOSITO' || task.tipoTask === 'SPOSTAMENTO') && task.idScaffaleFine != null) {
+      const key = `${task.idScaffaleFine}-${task.nuovaZ}-${task.nuovaY}-${task.nuovaX}`;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(task);
+    }
+  }
+  return map;
+});
+
+// Chiave: "idMappa-altezza-riga-colonna" → array di task in uscita da quello slot
+const taskUscitaIndex = computed(() => {
+  const map = new Map();
+  for (const task of taskAttiviDati.value) {
+    if ((task.tipoTask === 'PRELIEVO' || task.tipoTask === 'SPOSTAMENTO') && task.idScaffaleInizio != null) {
+      const key = `${task.idScaffaleInizio}-${task.vecchiaZ}-${task.vecchiaY}-${task.vecchiaX}`;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(task);
+    }
+  }
+  return map;
+});
+
+
 const getProdottoDaBatch = (idBatch) => {
   const batch = tuttiIBatch.value.find(b => Number(b.id) === Number(idBatch));
   if (!batch) return null;
@@ -111,24 +151,22 @@ const MAX_SPAZIO_CELLA = 100;
 
 const calcolaSpazioOccupatoCella = (idMappa, altezza, riga, colonna) => {
   let spazio = 0;
-  const merce = [...batchScaffaliDati.value, ...nuoviAssegnamenti.value].filter(
-    bs => Number(bs.idMappa) === Number(idMappa) && 
-          Number(bs.altezza) === Number(altezza) && 
-          Number(bs.riga) === Number(riga) && 
-          Number(bs.colonna) === Number(colonna)
-  );
+  const key = `${idMappa}-${altezza}-${riga}-${colonna}`;
+  const merce = [
+    ...(slotBatchIndex.value.get(key) || []),
+    ...nuoviAssegnamenti.value.filter(
+      bs => Number(bs.idMappa) === Number(idMappa) &&
+            Number(bs.altezza) === Number(altezza) &&
+            Number(bs.riga) === Number(riga) &&
+            Number(bs.colonna) === Number(colonna)
+    )
+  ];
   merce.forEach(item => {
     const prodotto = getProdottoDaBatch(item.idBatchProdotti);
     spazio += (item.qta * (prodotto ? prodotto.spazioUnitario || 1 : 1));
   });
 
-  const merceInArrivo = taskAttiviDati.value.filter(task => 
-    (task.tipoTask === 'DEPOSITO' || task.tipoTask === 'SPOSTAMENTO') &&
-    Number(task.idScaffaleFine) === Number(idMappa) &&
-    Number(task.nuovaZ) === Number(altezza) &&
-    Number(task.nuovaY) === Number(riga) &&
-    Number(task.nuovaX) === Number(colonna)
-  );
+  const merceInArrivo = (taskIngressoIndex.value.get(`${idMappa}-${altezza}-${riga}-${colonna}`) || []);
   merceInArrivo.forEach(task => {
     const prodotto = getProdottoDaBatch(task.idBatch);
     spazio += (task.quantita * (prodotto ? prodotto.spazioUnitario || 1 : 1));
@@ -139,17 +177,25 @@ const calcolaSpazioOccupatoCella = (idMappa, altezza, riga, colonna) => {
 
 const calcolaPesoOccupatoScaffale = (idMappa) => {
   let peso = 0;
-  const merce = [...batchScaffaliDati.value, ...nuoviAssegnamenti.value].filter(bs => Number(bs.idMappa) === Number(idMappa));
-  merce.forEach(item => {
+  // Recupera tutti i batch di questo scaffale dalle Map indicizzate
+  const tuttiIBatchScaffale = batchScaffaliDati.value
+    .filter(bs => Number(bs.idMappa) === Number(idMappa));
+  const nuoviAssegnamentiScaffale = nuoviAssegnamenti.value
+    .filter(bs => Number(bs.idMappa) === Number(idMappa));
+  [...tuttiIBatchScaffale, ...nuoviAssegnamentiScaffale].forEach(item => {
     const prodotto = getProdottoDaBatch(item.idBatchProdotti);
     peso += (item.qta * (prodotto ? prodotto.pesoUnitario || 0 : 0));
   });
   
-  const merceInArrivo = taskAttiviDati.value.filter(task => (task.tipoTask === 'DEPOSITO' || task.tipoTask === 'SPOSTAMENTO') && Number(task.idScaffaleFine) === Number(idMappa));
-  merceInArrivo.forEach(task => {
-    const prodotto = getProdottoDaBatch(task.idBatch);
-    peso += (task.quantita * (prodotto ? prodotto.pesoUnitario || 0 : 0));
-  });
+  // Task in arrivo su questo scaffale
+  for (const [, tasks] of taskIngressoIndex.value) {
+    for (const task of tasks) {
+      if (Number(task.idScaffaleFine) === Number(idMappa)) {
+        const prodotto = getProdottoDaBatch(task.idBatch);
+        peso += (task.quantita * (prodotto ? prodotto.pesoUnitario || 0 : 0));
+      }
+    }
+  }
 
   return Math.round(peso * 10) / 10;
 };
@@ -689,26 +735,17 @@ const getSlotStatus = (cella, slotIndex) => {
   const isOrizzontale = cella.orientamentoScaffale === 'ORIZZONTALE';
   const rigaLocale = Math.floor((slotIndex - 1) / (isOrizzontale ? info.max_righe : info.max_colonne));
   const colonnaLocale = ((slotIndex - 1) % (isOrizzontale ? info.max_righe : info.max_colonne));
+  const key = `${cella.id}-${pianoAttuale}-${rigaLocale}-${colonnaLocale}`;
 
   const hasNuovi = nuoviAssegnamenti.value.some(bs => 
     Number(bs.idMappa) === Number(cella.id) && Number(bs.altezza) === Number(pianoAttuale) && 
     Number(bs.riga) === Number(rigaLocale) && Number(bs.colonna) === Number(colonnaLocale) && Number(bs.qta) > 0
   );
   
-  const hasInArrivo = taskAttiviDati.value.some(task => 
-    Number(task.idScaffaleFine) === Number(cella.id) && Number(task.nuovaZ) === Number(pianoAttuale) &&
-    Number(task.nuovaY) === Number(rigaLocale) && Number(task.nuovaX) === Number(colonnaLocale)
-  );
-
-  const hasInUscita = taskAttiviDati.value.some(task => 
-    Number(task.idScaffaleInizio) === Number(cella.id) && Number(task.vecchiaZ) === Number(pianoAttuale) &&
-    Number(task.vecchiaY) === Number(rigaLocale) && Number(task.vecchiaX) === Number(colonnaLocale)
-  );
-  
-  const hasSalvati = batchScaffaliDati.value.some(bs => 
-    Number(bs.idMappa) === Number(cella.id) && Number(bs.altezza) === Number(pianoAttuale) && 
-    Number(bs.riga) === Number(rigaLocale) && Number(bs.colonna) === Number(colonnaLocale) && Number(bs.qta) > 0
-  );
+  // Lookup O(1) tramite le Map indicizzate
+  const hasInArrivo = (taskIngressoIndex.value.get(key) || []).length > 0;
+  const hasInUscita = (taskUscitaIndex.value.get(key) || []).length > 0;
+  const hasSalvati = (slotBatchIndex.value.get(key) || []).some(bs => Number(bs.qta) > 0);
 
   if (hasNuovi) return 'slot-nuovo'; 
   if (hasInArrivo) return 'slot-inarrivo';
@@ -777,45 +814,32 @@ const ruotaScaffaleSelezionato = () => { if (!scaffaleSelezionato.value) return;
 const spostaScaffaleQui = (x, y) => { if (!scaffaleSelezionato.value || !isPosizioneValida.value) return; scaffaleSelezionato.value.coordinataX = x; scaffaleSelezionato.value.coordinataY = y; scaffaleSelezionato.value = null; azzeraHover(); };
 const salvaMappa = async () => { isSaving.value = true; try { await api.post('/api/mappa/salva-posizioni', mappaDati.value); isEditing.value = false; scaffaleSelezionato.value = null; } catch (error) { alert("Errore salvataggio."); } finally { isSaving.value = false; } };
 
-onMounted(async () => {
-  const ruolo = sessionStorage.getItem('ruolo');
-  if (!ruolo) { router.push('/'); return; }
+const caricaDettagliReparto = async (idReparto) => {
+  if (!idReparto) return;
+  loadingDettagli.value = true;
+  // Resetta i dati del reparto precedente mentre carica
+  mappaDati.value = [];
+  batchScaffaliDati.value = [];
+  taskAttiviDati.value = [];
+  tuttiIBatch.value = [];
+  lottiSospesi.value = [];
+  lottiInSistemazione.value = [];
+  annullaModifiche(); // Annulla eventuali modifiche non salvate
+
   try {
-    const [resMappa, resReparti, resScaffali, resEtichette, resEtProd] = await Promise.all([
-      api.get('/api/mappa/carica'),
-      api.get('/api/reparti/carica'),
-      api.get('/api/scaffali/carica'),
-      api.get('/api/etichette/carica').catch(() => ({ data: [] })),
-      api.get('/api/etprod/carica').catch(() => ({ data: [] }))
+    const [resMappa, resBatchScaffali, resBatchProdotti, resTaskAttivi] = await Promise.all([
+      api.get(`/api/mappa/reparto/${idReparto}`),
+      api.get(`/api/batch-scaffale/reparto/${idReparto}`),
+      api.get(`/api/batch-prodotti/reparto/${idReparto}`),
+      api.get(`/api/tasks/attivi/reparto/${idReparto}`).catch(() => ({ data: [] }))
     ]);
+
     mappaDati.value = resMappa.data;
-    repartiDati.value = resReparti.data;
-    scaffaliDati.value = resScaffali.data;
-    tutteLeEtichette.value = resEtichette.data;
-    etProdDati.value = resEtProd.data;
+    batchScaffaliDati.value = resBatchScaffali.data;
+    taskAttiviDati.value = resTaskAttivi.data;
 
-    try {
-      const resProdotti = await api.get('/api/prodotti/carica'); 
-      tuttiIProdotti.value = resProdotti.data;
-    } catch(e) { console.error("Errore Prodotti:", e); }
-
-    let lottiBackend = [];
-    try {
-      const resLotti = await api.get('/api/batch-prodotti/carica');
-      lottiBackend = resLotti.data;
-    } catch (e) { console.error("Errore Lotti:", e); }
-
-    let scaffaliBackend = [];
-    try {
-      const resBatchScaffali = await api.get('/api/batch-scaffale/carica');
-      scaffaliBackend = resBatchScaffali.data;
-      batchScaffaliDati.value = scaffaliBackend;
-    } catch (e) { console.error("Errore API Batch Scaffali:", e); }
-
-    try {
-      const resTaskAttivi = await api.get('/api/tasks/attivi');
-      taskAttiviDati.value = resTaskAttivi.data;
-    } catch(e) { console.error("Errore Tasks:", e); }
+    const lottiBackend = resBatchProdotti.data;
+    const scaffaliBackend = resBatchScaffali.data;
 
     if (lottiBackend.length > 0) {
       const lottiCalcolati = lottiBackend.map(lotto => {
@@ -823,13 +847,10 @@ onMounted(async () => {
           .filter(bs => Number(bs.idBatchProdotti) === Number(lotto.id))
           .reduce((sum, item) => sum + item.qta, 0);
           
-        // qtaInArrivoDaTasks: conta solo i DEPOSITO per sottrarre dal "floating" (merci mai assegnate a scaffale)
         const qtaInArrivoDaTasks = taskAttiviDati.value
           .filter(t => Number(t.idBatch) === Number(lotto.id) && t.tipoTask === 'DEPOSITO')
           .reduce((sum, item) => sum + item.quantita, 0);
 
-        // qtaInSistemazione: conta TUTTI i tipi di task attivi (DEPOSITO, SPOSTAMENTO, PRELIEVO)
-        // per mostrare nel tab "In Sistemazione" qualsiasi batch con operazioni in corso
         const qtaInSistemazione = taskAttiviDati.value
           .filter(t => Number(t.idBatch) === Number(lotto.id))
           .reduce((sum, item) => sum + item.quantita, 0);
@@ -848,12 +869,56 @@ onMounted(async () => {
       lottiSospesi.value = lottiCalcolati.filter(l => l.quantita > 0);
       lottiInSistemazione.value = lottiCalcolati.filter(l => l.qtaInSistemazione > 0);
     }
-
   } catch (e) {
-    alert("Errore nel caricamento del magazzino.");
+    console.error('Errore caricamento dettagli reparto:', e);
   } finally {
-    loading.value = false;
+    loadingDettagli.value = false;
   }
+};
+
+watch(
+  () => route.params.id,
+  (newId) => {
+    if (newId) {
+      caricaDettagliReparto(newId);
+    }
+  }
+);
+
+onMounted(async () => {
+  const ruolo = sessionStorage.getItem('ruolo');
+  if (!ruolo) { router.push('/'); return; }
+
+  const idReparto = route.params.id;
+
+  // =====================================================================
+  // FASE 1 — Dati leggeri e globali: layout visibile immediatamente
+  // =====================================================================
+  try {
+    const [resReparti, resScaffali, resEtichette, resEtProd, resProdotti] = await Promise.all([
+      api.get('/api/reparti/carica'),
+      api.get('/api/scaffali/carica'),
+      api.get('/api/etichette/carica').catch(() => ({ data: [] })),
+      api.get('/api/etprod/carica').catch(() => ({ data: [] })),
+      api.get('/api/prodotti/carica').catch(() => ({ data: [] }))
+    ]);
+    repartiDati.value = resReparti.data;
+    scaffaliDati.value = resScaffali.data;
+    tutteLeEtichette.value = resEtichette.data;
+    etProdDati.value = resEtProd.data;
+    tuttiIProdotti.value = resProdotti.data;
+  } catch (e) {
+    alert('Errore nel caricamento base del magazzino.');
+    loading.value = false;
+    return;
+  } finally {
+    loading.value = false; // Il layout del reparto è già renderizzabile
+  }
+
+  // =====================================================================
+  // FASE 2 — Dati pesanti FILTRATI per reparto (lazy loading)
+  // =====================================================================
+  await caricaDettagliReparto(idReparto);
 });
 </script>
 
@@ -889,6 +954,12 @@ onMounted(async () => {
           </div>
 
           <div class="grid-container-wrapper">
+            <!-- Overlay di caricamento per la sincronizzazione AWS -->
+            <div v-if="loadingDettagli" class="loading-overlay-fase2">
+              <div class="spinner"></div>
+              <span>Sincronizzazione lotti e task in corso...</span>
+            </div>
+
             <div class="grid-scroll-area">
               <div class="ingresso-reparto">PORTA REPARTO</div>
 
@@ -938,10 +1009,13 @@ onMounted(async () => {
                       }"
                       @click.stop="gestisciClickCella(cella, slotIndex)"
                     >
-                      <div v-if="haPiano(cella) && getSlotStatus(cella, slotIndex) !== 'slot-vuoto'" class="batch-placeholder" :class="getSlotStatus(cella, slotIndex)">
+                      <!-- Skeleton shimmer durante il caricamento Fase 2 -->
+                      <div v-if="loadingDettagli" class="slot-skeleton"></div>
+                      <div v-else-if="haPiano(cella) && getSlotStatus(cella, slotIndex) !== 'slot-vuoto'" class="batch-placeholder" :class="getSlotStatus(cella, slotIndex)">
                          <span class="spazio-indicatore">{{ calcolaSpazioOccupatoCella(cella.id, getPiano(cella.id), Math.floor((slotIndex-1) / (cella.orientamentoScaffale === 'ORIZZONTALE' ? getDatiTecniciScaffale(cella.idScaffale).max_righe : getDatiTecniciScaffale(cella.idScaffale).max_colonne)), ((slotIndex-1) % (cella.orientamentoScaffale === 'ORIZZONTALE' ? getDatiTecniciScaffale(cella.idScaffale).max_righe : getDatiTecniciScaffale(cella.idScaffale).max_colonne))) }}/{{ MAX_SPAZIO_CELLA }}</span>
                       </div>
                     </div>
+
                   </div>
 
                 </div>
@@ -1350,6 +1424,7 @@ onMounted(async () => {
 .info-label { font-weight: 600; color: #475569; font-size: 0.9rem; display: flex; align-items: center; gap: 8px; }
 .info-value { font-weight: 800; color: #0f172a; font-size: 0.95rem; }
 .grid-container-wrapper { flex: 1; background-color: #e2e8f0; position: relative; overflow: hidden; }
+.loading-overlay-fase2 { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(248, 250, 252, 0.85); backdrop-filter: blur(3px); z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; font-weight: 700; color: #1e293b; font-size: 1.1rem; border-radius: 8px;}
 .grid-scroll-area { width: 100%; height: 100%; overflow: auto; padding: 40px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; }
 .ingresso-reparto { background: #cbd5e1; padding: 5px 60px; font-weight: 800; color: #334155; font-size: 0.8rem; letter-spacing: 4px; border-top-left-radius: 8px; border-top-right-radius: 8px; margin-bottom: 0; border: 3px solid #94a3b8; border-bottom: none; }
 .griglia-dinamica { display: grid; gap: 0; background-image: linear-gradient(#f1f5f9 1px, transparent 1px), linear-gradient(90deg, #f1f5f9 1px, transparent 1px); background-size: 50px 50px; background-color: #ffffff; border: 4px solid #94a3b8; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: max-content; position: relative; }
@@ -1396,6 +1471,19 @@ onMounted(async () => {
 .slot-1x1.cursor-info { cursor: pointer; }
 .slot-1x1.cursor-assegna:hover { background-color: rgba(16, 185, 129, 0.2); border-color: #10b981; }
 .slot-1x1.cursor-info:hover { background-color: rgba(59, 130, 246, 0.2); }
+
+/* Skeleton shimmer per il lazy loading Fase 2 */
+.slot-skeleton {
+  width: 80%; height: 80%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+}
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
 
 .floating-sidebar { position: fixed; top: 0; right: -380px; width: 380px; height: 100vh; background: white; box-shadow: -4px 0 15px rgba(0,0,0,0.05); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 50; display: flex; flex-direction: column; border-left: 1px solid #e2e8f0; }
 .floating-sidebar.sidebar-open { transform: translateX(-380px); }

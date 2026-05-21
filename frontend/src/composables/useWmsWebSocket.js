@@ -19,7 +19,11 @@ export function useWmsWebSocket() {
         const emailPulita = email.trim().toLowerCase()
 
         stompClient = new Client({
-            webSocketFactory: () => new SockJS('http://localhost:8080/ws-wms'),
+            // Usa la variabile d'ambiente (vuota per il proxy Docker, o l'URL di Render)
+            webSocketFactory: () => {
+                const baseUrl = import.meta.env.VITE_API_URL || '';
+                return new SockJS(`${baseUrl}/ws-wms`);
+            },
             onConnect: () => {
                 isConnected.value = true
                 const topic = (ruolo.toUpperCase() === 'ADMIN') ? '/topic/tasks' : `/queue/tasks/${emailPulita}`;

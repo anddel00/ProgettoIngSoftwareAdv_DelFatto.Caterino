@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -26,6 +27,17 @@ public class MappaController {
     public ResponseEntity<List<MappaDTO>> getMappa() {
         try {
             List<MappaDTO> mappa = mappaService.getTuttaLaMappa();
+            return ResponseEntity.ok(mappa);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    // LAZY LOADING: Restituisce solo le celle del reparto specificato
+    @GetMapping("/reparto/{id}")
+    public ResponseEntity<List<MappaDTO>> getMappaPerReparto(@PathVariable Long id) {
+        try {
+            List<MappaDTO> mappa = mappaService.getMappaPerReparto(id);
             return ResponseEntity.ok(mappa);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();

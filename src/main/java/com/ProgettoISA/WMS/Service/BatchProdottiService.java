@@ -17,9 +17,9 @@ import com.ProgettoISA.WMS.Repository.ProdottiRepository;
 
 @Service
 public class BatchProdottiService {
-    
-    private final BatchProdottiRepository batchProdottiRepository; 
-    private final ProdottiRepository prodottiRepository; 
+
+    private final BatchProdottiRepository batchProdottiRepository;
+    private final ProdottiRepository prodottiRepository;
 
     public BatchProdottiService(BatchProdottiRepository batchProdottiRepository, ProdottiRepository prodottiRepository) {
         this.batchProdottiRepository = batchProdottiRepository;
@@ -30,7 +30,7 @@ public class BatchProdottiService {
         // 1. Inizializziamo DUE liste: una per il Database, una per la Risposta
         List<BatchProdotti> batchListEntity = new ArrayList<>();
         List<BatchProdottiDTO> batchListDTO = new ArrayList<>();
-        
+
         // 2. Prendiamo i VERI prodotti dal DB per evitare ID inesistenti
         List<Prodotti> tuttiIProdotti = prodottiRepository.findAll();
         if (tuttiIProdotti.isEmpty()) {
@@ -42,18 +42,18 @@ public class BatchProdottiService {
         LocalDate dataFine = oggi.plusYears(1);
         long giorniTra = ChronoUnit.DAYS.between(dataInizio, dataFine);
 
-        for(int i = 0; i < n; i++) {
-           
+        for (int i = 0; i < n; i++) {
+
             long giorniCasuali = ThreadLocalRandom.current().nextLong(giorniTra + 1);
             int quantitaCasuale = ThreadLocalRandom.current().nextInt(1, 6);
             LocalDate scadenzaCasuale = dataInizio.plusDays(giorniCasuali);
-            
+
             // Peschiamo un prodotto casuale ma REALE dalla lista
             Prodotti prodottoScelto = tuttiIProdotti.get(ThreadLocalRandom.current().nextInt(tuttiIProdotti.size()));
 
             // --- A. CREIAMO L'ENTITÀ (Quella che piace al DB) ---
             BatchProdotti batchEntity = new BatchProdotti();
-            batchEntity.setProdotto(prodottoScelto); 
+            batchEntity.setProdotto(prodottoScelto);
             batchEntity.setQta(quantitaCasuale);
             batchEntity.setScadenza(scadenzaCasuale);
             batchListEntity.add(batchEntity);
@@ -65,10 +65,10 @@ public class BatchProdottiService {
             batchDTO.setScadenza(scadenzaCasuale.toString());
             batchListDTO.add(batchDTO);
         }
-        
+
         // 3. IL FIX: Salviamo la lista delle ENTITÀ!
         batchProdottiRepository.saveAll(batchListEntity);
-        
+
         // 4. Restituiamo i DTO
         return batchListDTO;
     }
@@ -83,4 +83,29 @@ public class BatchProdottiService {
             bp.getScadenza().toString()
         )).collect(Collectors.toList());    
     }
+
+    /**
+     * LAZY LOADING: Restituisce i batch rilevanti per un reparto.
+     * Esegue DUE query semplici (nessuna subquery correlata) e le unisce in-memory:
+     *  1) Batch con almeno uno slot nel reparto (JOIN diretto su BatchScaffale)
+     *  2) Batch completamente sospesi (mai assegnati a nessuno scaffale)
+     */
+    public List<BatchProdottiDTO> getBatchProdottiPerReparto(Long idReparto) {
+        // Query 1: batch fisicamente nel reparto
+        List<BatchProdotti> nelReparto = batchProdottiRepository.findByReparto(idReparto);
+        // Query 2: batch mai assegnati a nessun scaffale (sospesi globali)
+        List<BatchProdotti> sospesi = batchProdottiRepository.findCompletamenteSospesi();
+
+        // Unione senza duplicati
+        java.util.LinkedHashSet<BatchProdotti> risultato = new java.util.LinkedHashSet<>(nelReparto);
+        risultato.addAll(sospesi);
+
+        return risultato.stream().map(bp -> new BatchProdottiDTO(
+            bp.getId(),
+            bp.getProdotto().getId(),
+            bp.getQta(),
+            bp.getScadenza().toString()
+        )).collect(Collectors.toList());
+    }
+
 }

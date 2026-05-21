@@ -1,5 +1,6 @@
 package com.ProgettoISA.WMS.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -23,4 +24,9 @@ public interface BatchScaffaleRepository extends JpaRepository<BatchScaffale, Lo
     // 2. Calcola la somma di tutti i pezzi di un batch sparsi per il magazzino
     @Query("SELECT SUM(b.qta) FROM BatchScaffale b WHERE b.batch_prodotti.id = :idBatch")
     Integer sumQtaByIdBatch(@Param("idBatch") Long idBatch);
+
+    // 3. LAZY LOADING: Recupera solo i batch-scaffale di un reparto specifico
+    // JOIN esplicito per evitare N+1 query su mappa e reparto
+    @Query("SELECT b FROM BatchScaffale b JOIN b.mappa m WHERE m.reparto.id = :idReparto")
+    List<BatchScaffale> findByMappaRepartoId(@Param("idReparto") Long idReparto);
 }

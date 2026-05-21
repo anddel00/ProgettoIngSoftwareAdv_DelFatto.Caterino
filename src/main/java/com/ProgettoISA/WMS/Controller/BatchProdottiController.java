@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -25,29 +26,36 @@ public class BatchProdottiController {
     }
 
     @PostMapping("/simulaArrivi")
-public ResponseEntity<List<BatchProdottiDTO>> simulaArrivi(@RequestBody int numeroBatch) {
-    try {
-        // Log di controllo per vedere se la chiamata arriva
-        System.out.println("🚀 Richiesta di simulazione ricevuta per " + numeroBatch + " lotti.");
-        List<BatchProdottiDTO> batchList = batchProdottiService.generaBatchProdotti(numeroBatch);
-        return ResponseEntity.ok(batchList);
-        
-    } catch (Exception e) {
-        // Questo scriverà l'errore nella console di Spring Boot
-        System.err.println("❌ ERRORE DURANTE LA SIMULAZIONE:");
-        e.printStackTrace(); 
-        
-        return ResponseEntity.internalServerError().build();
+    public ResponseEntity<List<BatchProdottiDTO>> simulaArrivi(@RequestBody int numeroBatch) {
+        try {
+            System.out.println("🚀 Richiesta di simulazione ricevuta per " + numeroBatch + " lotti.");
+            List<BatchProdottiDTO> batchList = batchProdottiService.generaBatchProdotti(numeroBatch);
+            return ResponseEntity.ok(batchList);
+        } catch (Exception e) {
+            System.err.println("❌ ERRORE DURANTE LA SIMULAZIONE:");
+            e.printStackTrace(); 
+            return ResponseEntity.internalServerError().build();
+        }
     }
-}
 
-@GetMapping("/carica")
-public ResponseEntity<List<BatchProdottiDTO>> caricaBatchProdotti() {
-    try {
-        List<BatchProdottiDTO> batchList = batchProdottiService.getTuttiIBatchProdotti();
-        return ResponseEntity.ok(batchList);
-    } catch (Exception e) {
-        return ResponseEntity.internalServerError().build();
+    @GetMapping("/carica")
+    public ResponseEntity<List<BatchProdottiDTO>> caricaBatchProdotti() {
+        try {
+            List<BatchProdottiDTO> batchList = batchProdottiService.getTuttiIBatchProdotti();
+            return ResponseEntity.ok(batchList);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
     }
-}
+
+    // LAZY LOADING: Restituisce solo i batch del reparto (assegnati + sospesi compatibili)
+    @GetMapping("/reparto/{id}")
+    public ResponseEntity<List<BatchProdottiDTO>> caricaBatchProdottiPerReparto(@PathVariable Long id) {
+        try {
+            List<BatchProdottiDTO> batchList = batchProdottiService.getBatchProdottiPerReparto(id);
+            return ResponseEntity.ok(batchList);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
 }
