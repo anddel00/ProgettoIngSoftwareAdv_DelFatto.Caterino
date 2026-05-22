@@ -41,6 +41,48 @@ const vaiAlReparto = (id) => {
   mappaAperta.value = false
 }
 
+// --- LOGICA MODALE NUOVO REPARTO ---
+const showAddRepartoModal = ref(false)
+const isSubmitting = ref(false)
+const addRepartoError = ref('')
+const newReparto = ref({
+  nome: '',
+  maxX: 4,
+  maxY: 2,
+  temperatura: 20
+})
+
+const apriModaleReparto = () => {
+  addRepartoError.value = ''
+  newReparto.value = { nome: '', maxX: 4, maxY: 2, temperatura: 20 }
+  showAddRepartoModal.value = true
+}
+
+const chiudiModaleReparto = () => {
+  showAddRepartoModal.value = false
+}
+
+const creaReparto = async () => {
+  try {
+    addRepartoError.value = ''
+    isSubmitting.value = true
+    const res = await api.post('/api/reparti/crea', {
+      nome: newReparto.value.nome,
+      maxX: newReparto.value.maxX,
+      maxY: newReparto.value.maxY,
+      temperatura: newReparto.value.temperatura
+    })
+    reparti.value.push(res.data)
+    chiudiModaleReparto()
+  } catch (e) {
+    addRepartoError.value = e.response?.data || 'Errore durante la creazione del reparto.'
+    console.error(e)
+  } finally {
+    isSubmitting.value = false
+  }
+}
+
+
 // Badge temperatura → classe colore
 const getTempClass = (temp) => {
   if (temp < 0) return 'temp-freezing'
@@ -131,6 +173,12 @@ watch(() => route.path, (nuovoPath) => {
             <span class="reparto-nome">{{ reparto.nome }}</span>
             <span class="reparto-temp-label">{{ reparto.temperatura }}°C</span>
           </div>
+          
+          <!-- Bottone Aggiungi Reparto -->
+          <div class="reparto-item btn-add-reparto" @click.stop="apriModaleReparto" v-if="!repartiLoading">
+            <svg class="nav-icon" style="width:16px;height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+            <span class="reparto-nome">Aggiungi Reparto</span>
+          </div>
         </div>
       </div>
 
@@ -165,6 +213,52 @@ watch(() => route.path, (nuovoPath) => {
       </button>
     </div>
   </aside>
+
+  <!-- Modale Aggiungi Reparto -->
+  <div v-if="showAddRepartoModal" class="modal-overlay" @click.self="chiudiModaleReparto">
+    <div class="modal-content glass-panel">
+      <div class="modal-header">
+        <h3>Crea Nuovo Reparto</h3>
+        <button class="close-btn" @click="chiudiModaleReparto">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      
+      <div class="modal-body">
+        <form @submit.prevent="creaReparto" class="reparto-form">
+          <div class="form-group">
+            <label>Nome Reparto</label>
+            <input type="text" v-model="newReparto.nome" required placeholder="Es. Celle Frigo" />
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Max X (min 4)</label>
+              <input type="number" v-model="newReparto.maxX" min="4" required />
+            </div>
+            <div class="form-group">
+              <label>Max Y (min 2)</label>
+              <input type="number" v-model="newReparto.maxY" min="2" required />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Temperatura (°C)</label>
+            <input type="number" v-model="newReparto.temperatura" required />
+          </div>
+          
+          <div v-if="addRepartoError" class="error-msg">
+            {{ addRepartoError }}
+          </div>
+          
+          <div class="modal-actions">
+            <button type="button" class="btn-cancel" @click="chiudiModaleReparto">Annulla</button>
+            <button type="submit" class="btn-submit" :disabled="isSubmitting">
+              {{ isSubmitting ? 'Creazione...' : 'Crea Reparto' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
 </template>
 
 <style scoped>
@@ -385,4 +479,182 @@ watch(() => route.path, (nuovoPath) => {
 
 .badge-blu { background: #3b82f6; }
 .badge-verde { background: #10b981; }
+
+/* --- BOTTONE AGGIUNGI REPARTO --- */
+.btn-add-reparto {
+  margin-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 0 0 8px 8px;
+  color: #60a5fa;
+  justify-content: center;
+  font-weight: 600;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+}
+.btn-add-reparto:hover {
+  background-color: rgba(59, 130, 246, 0.1);
+  color: #93c5fd;
+}
+
+/* --- MODALE AGGIUNGI REPARTO --- */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content.glass-panel {
+  background: rgba(17, 24, 39, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 400px;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #fff;
+  font-weight: 600;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 8px;
+  display: flex;
+  transition: all 0.2s;
+}
+
+.close-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.close-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.modal-body {
+  padding: 24px;
+}
+
+.reparto-form .form-group {
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-row {
+  display: flex;
+  gap: 16px;
+}
+.form-row .form-group {
+  flex: 1;
+}
+
+.reparto-form label {
+  font-size: 0.85rem;
+  color: #cbd5e1;
+  font-weight: 500;
+}
+
+.reparto-form input {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #fff;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+
+.reparto-form input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+}
+
+.error-msg {
+  color: #ef4444;
+  font-size: 0.85rem;
+  margin-bottom: 16px;
+  padding: 10px;
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: 8px;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.btn-cancel, .btn-submit {
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-cancel {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #cbd5e1;
+}
+
+.btn-cancel:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+}
+
+.btn-submit {
+  background: #3b82f6;
+  border: none;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.btn-submit:hover:not(:disabled) {
+  background: #2563eb;
+  transform: translateY(-1px);
+}
+
+.btn-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
 </style>

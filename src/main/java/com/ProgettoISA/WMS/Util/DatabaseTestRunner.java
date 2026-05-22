@@ -75,6 +75,7 @@ public class DatabaseTestRunner implements CommandLineRunner {
             Etichette vetro = etichetteRepository.save(new Etichette("Vetro"));
             Etichette fragile = etichetteRepository.save(new Etichette("Fragile"));
             Etichette alimentare = etichetteRepository.save(new Etichette("Alimentare"));
+            Etichette alcolico = etichetteRepository.save(new Etichette("Alcolico"));
 
             List<Prodotti> listaProdotti = new ArrayList<>();
             List<EtProd> listaRelazioni = new ArrayList<>();
@@ -97,6 +98,11 @@ public class DatabaseTestRunner implements CommandLineRunner {
             p = new Prodotti("Riso Arborio", 1L, 1.0f, 2.50f, 10L, 30L); listaProdotti.add(p); listaRelazioni.add(new EtProd(p, alimentare));
             p = new Prodotti("Passata di Pomodoro", 1L, 0.7f, 0.80f, 10L, 30L); listaProdotti.add(p); listaRelazioni.add(new EtProd(p, alimentare)); listaRelazioni.add(new EtProd(p, vetro)); listaRelazioni.add(new EtProd(p, fragile));
             p = new Prodotti("Olio Extra Vergine", 1L, 1.0f, 5.00f, 10L, 30L); listaProdotti.add(p); listaRelazioni.add(new EtProd(p, alimentare)); listaRelazioni.add(new EtProd(p, vetro)); listaRelazioni.add(new EtProd(p, fragile));
+
+            // --- ALCOLICI ---
+            p = new Prodotti("Vino Rosso Chianti", 1L, 1.2f, 8.50f, 10L, 20L); listaProdotti.add(p); listaRelazioni.add(new EtProd(p, alcolico)); listaRelazioni.add(new EtProd(p, alimentare)); listaRelazioni.add(new EtProd(p, vetro)); listaRelazioni.add(new EtProd(p, fragile));
+            p = new Prodotti("Birra Artigianale IPA", 1L, 0.5f, 3.50f, 5L, 15L); listaProdotti.add(p); listaRelazioni.add(new EtProd(p, alcolico)); listaRelazioni.add(new EtProd(p, alimentare)); listaRelazioni.add(new EtProd(p, vetro));
+            p = new Prodotti("Vodka liscia", 1L, 1.0f, 15.00f, -10L, 30L); listaProdotti.add(p); listaRelazioni.add(new EtProd(p, alcolico)); listaRelazioni.add(new EtProd(p, alimentare)); listaRelazioni.add(new EtProd(p, vetro)); listaRelazioni.add(new EtProd(p, fragile));
 
             prodottiRepository.saveAll(listaProdotti);
             etProdRepository.saveAll(listaRelazioni);
@@ -224,7 +230,7 @@ public class DatabaseTestRunner implements CommandLineRunner {
             utentiService.registraUtente(admin, adminRole.getNomeRuolo());
             System.out.println("✅ Database pronto. Admin: admin@wms.it / admin123");
         } catch (Exception e) {
-            System.out.println("ℹ️ Database già popolato o utente presente.");
+            System.out.println("ℹ️ Admin presente");
         }
 
         try {
@@ -238,7 +244,7 @@ public class DatabaseTestRunner implements CommandLineRunner {
             utentiService.registraUtente(dipendente, "Dipendente");
             System.out.println("✅ Dipendente creato: andrea@wms.it / andrea123");
         } catch (Exception e) {
-            System.out.println("ℹ️ Database già popolato o utente presente.");
+            System.out.println("ℹ️ Dipendente presente");
         }
     }
 }

@@ -747,17 +747,25 @@ const tasksPrelievo    = computed(() => tasksInSistemazione.value.filter(t => t.
 const tasksDeposito    = computed(() => tasksInSistemazione.value.filter(t => t.tipoTask === 'DEPOSITO'));
 
 const isProdottoCompatibileConReparto = (idProdotto, reparto) => {
-  const etichette = getEtichetteProdotto(idProdotto);
+  const etichette = getEtichetteProdotto(idProdotto).map(e => e.nome.toLowerCase());
   const repNome = (reparto.nome || "").toLowerCase();
   
-  const isFresco = etichette.some(e => e.nome.toLowerCase().includes('fresc'));
-  const isSurgelato = etichette.some(e => e.nome.toLowerCase().includes('surgelat'));
+  const isFresco = etichette.some(e => e.includes('fresc'));
+  const isSurgelato = etichette.some(e => e.includes('surgelat'));
+  const isAlcolico = etichette.some(e => e.includes('alcolic'));
+  const isSecco = !isFresco && !isSurgelato && !isAlcolico;
   
   if (repNome.includes('fresc')) return isFresco;
   if (repNome.includes('surgelat')) return isSurgelato;
+  if (repNome.includes('alcolic')) return isAlcolico;
   
-  // Se il reparto è secco (non fresco e non surgelato), o altro
-  return !isFresco && !isSurgelato;
+  if (repNome.includes('secc')) return isSecco;
+
+  // Fallback generico: se il nome del reparto è in un'etichetta o viceversa
+  if (etichette.some(e => repNome.includes(e) || e.includes(repNome))) return true;
+
+  // Default behaviour for unknown departments that don't match any specific tag
+  return false;
 };
 
 const getSlotStatus = (cella, slotIndex) => {

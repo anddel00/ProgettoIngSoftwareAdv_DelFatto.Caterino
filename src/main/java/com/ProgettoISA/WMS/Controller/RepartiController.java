@@ -1,11 +1,10 @@
 package com.ProgettoISA.WMS.Controller;
 
 import java.util.List;
+
+import com.ProgettoISA.WMS.Model.Reparti;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import com.ProgettoISA.WMS.DTO.RepartiDTO;
 import com.ProgettoISA.WMS.Service.RepartiService;
@@ -29,4 +28,19 @@ public ResponseEntity<List<RepartiDTO>> getReparti() {
         return ResponseEntity.internalServerError().build();
     }
 }
+
+    @PostMapping("/crea")
+    public ResponseEntity<?> creaReparto(@RequestBody RepartiDTO dto) {
+        try {
+            // Check base di validazione
+            if (dto.getMaxX() < 4 || dto.getMaxY() < 2) {
+                return ResponseEntity.badRequest().body("Le dimensioni del reparto sono troppo piccole per generare scaffali.");
+            }
+
+            Reparti creato = repartiService.creaRepartoConPlanimetria(dto);
+            return ResponseEntity.ok(creato);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Errore durante la creazione del reparto: " + e.getMessage());
+        }
+    }
 }
