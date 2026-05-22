@@ -94,35 +94,56 @@ public class TaskService {
     public List<TaskDTO> creaEAssegnaMultipli(List<CreaTaskDTO> dtos) {
         List<Task> nuoviTask = new java.util.ArrayList<>();
 
-        // Crea fisicamente i task
+        // Crea fisicamente i task gestendo lo splitting
         for (CreaTaskDTO dto : dtos) {
             if (dto.getQuantita() <= 0) {
                 throw new IllegalArgumentException("Errore di sicurezza: La quantità deve essere maggiore di zero.");
             }
-            Task nuovoTask = new Task();
-            nuovoTask.setDescrizione(dto.getDescrizione());
-            nuovoTask.setTipo_task(dto.getTipoTask());
-            nuovoTask.setQta_spostata(dto.getQuantita());
-            nuovoTask.setStato_task("DA_FARE");
-            nuovoTask.setVecchia_x(dto.getVecchiaX());
-            nuovoTask.setVecchia_y(dto.getVecchiaY());
-            nuovoTask.setVecchia_z(dto.getVecchiaZ());
-            nuovoTask.setNuova_x(dto.getNuovaX());
-            nuovoTask.setNuova_y(dto.getNuovaY());
-            nuovoTask.setNuova_z(dto.getNuovaZ());
-            
-            // Collega le entità se fornite
+
+            com.ProgettoISA.WMS.Model.BatchProdotti batch = null;
             if (dto.getIdBatch() != null) {
-                nuovoTask.setBatch_prodotti(batchProdottiRepository.findById(dto.getIdBatch()).orElse(null));
-            }
-            if (dto.getIdScaffaleInizio() != null) {
-                nuovoTask.setScaffale_inizio(mappaRepository.findById(dto.getIdScaffaleInizio()).orElse(null));
-            }
-            if (dto.getIdScaffaleFine() != null) {
-                nuovoTask.setScaffale_fine(mappaRepository.findById(dto.getIdScaffaleFine()).orElse(null));
+                batch = batchProdottiRepository.findById(dto.getIdBatch()).orElse(null);
             }
 
-            nuoviTask.add(taskRepository.save(nuovoTask));
+            float pesoUnitario = (batch != null && batch.getProdotto() != null) ? batch.getProdotto().getPesoUnitario() : 0f;
+            int qtaDaSpostare = dto.getQuantita();
+
+            // FASE 1: Generazione e Spezzamento dei Task
+            while (qtaDaSpostare > 0) {
+                int qta_max = qtaDaSpostare;
+                if (pesoUnitario > 0) {
+                    // Calcolo pezzi massimi per 500 kg
+                    int pezziMax = (int) Math.floor(500.0 / pesoUnitario);
+                    if (pezziMax > 0 && pezziMax < qtaDaSpostare) {
+                        qta_max = pezziMax;
+                    }
+                }
+
+                Task nuovoTask = new Task();
+                nuovoTask.setDescrizione(dto.getDescrizione());
+                nuovoTask.setTipo_task(dto.getTipoTask());
+                nuovoTask.setQta_spostata(qta_max);
+                nuovoTask.setStato_task("DA_FARE");
+                nuovoTask.setVecchia_x(dto.getVecchiaX());
+                nuovoTask.setVecchia_y(dto.getVecchiaY());
+                nuovoTask.setVecchia_z(dto.getVecchiaZ());
+                nuovoTask.setNuova_x(dto.getNuovaX());
+                nuovoTask.setNuova_y(dto.getNuovaY());
+                nuovoTask.setNuova_z(dto.getNuovaZ());
+
+                // Collega le entità se fornite
+                nuovoTask.setBatch_prodotti(batch);
+                if (dto.getIdScaffaleInizio() != null) {
+                    nuovoTask.setScaffale_inizio(mappaRepository.findById(dto.getIdScaffaleInizio()).orElse(null));
+                }
+                if (dto.getIdScaffaleFine() != null) {
+                    nuovoTask.setScaffale_fine(mappaRepository.findById(dto.getIdScaffaleFine()).orElse(null));
+                }
+
+                nuoviTask.add(taskRepository.save(nuovoTask));
+
+                qtaDaSpostare -= qta_max;
+            }
         }
 
         // Assegna automaticamente

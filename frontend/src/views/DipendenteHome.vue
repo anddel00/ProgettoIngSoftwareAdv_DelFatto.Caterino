@@ -121,6 +121,22 @@ const aggiornaStatoTask = async (task, nuovoStato) => {
     alert("Impossibile aggiornare lo stato del task. Riprova.")
   }
 }
+
+// Helper: costruisce il label leggibile di uno slot da idScaffale + coordinate
+const labelScaffale = (idScaffale, y, x, z) => {
+  if (!idScaffale) return null
+  return `S${idScaffale} · R${y + 1} C${x + 1} P${z + 1}`
+}
+
+// Percorso contestuale per tipo di task
+const getPercorso = (task) => {
+  const inizio = labelScaffale(task.idScaffaleInizio, task.vecchiaY, task.vecchiaX, task.vecchiaZ)
+  const fine   = labelScaffale(task.idScaffaleFine,   task.nuovaY,  task.nuovaX,  task.nuovaZ)
+  if (task.tipoTask === 'SPOSTAMENTO') return { da: inizio || '—', a: fine || '—' }
+  if (task.tipoTask === 'PRELIEVO')    return { da: inizio || '—', a: 'In attesa' }
+  if (task.tipoTask === 'DEPOSITO')    return { da: 'In attesa', a: fine || '—' }
+  return { da: '—', a: '—' }
+}
 </script>
 
 <template>
@@ -205,7 +221,7 @@ const aggiornaStatoTask = async (task, nuovoStato) => {
 
             <div class="location-box">
               <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-              <span>Posizione da definire sulla Mappa</span>
+              <span><strong>Da:</strong> {{ getPercorso(task).da }} &nbsp;➔&nbsp; <strong>A:</strong> {{ getPercorso(task).a }}</span>
             </div>
 
             <div class="qty-box">Quantità da spostare: <strong>{{ task.quantita }} unità</strong></div>

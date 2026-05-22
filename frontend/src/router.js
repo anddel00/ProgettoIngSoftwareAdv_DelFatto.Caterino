@@ -73,4 +73,17 @@ const router = createRouter({
     routes: routes
 })
 
+// 4. Protezione delle rotte (Navigation Guard)
+router.beforeEach((to, from, next) => {
+    // Controlla se l'utente ha un token salvato nella sessione
+    const isAuthenticated = sessionStorage.getItem('token') !== null;
+    
+    // Se cerca di andare in una pagina diversa dal Login e NON è autenticato
+    if (to.name !== 'Login' && !isAuthenticated) {
+        next({ name: 'Login' }); // Reindirizza al Login
+    } else {
+        next(); // Altrimenti lascialo passare
+    }
+});
+
 export default router

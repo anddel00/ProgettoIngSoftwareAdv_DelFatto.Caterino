@@ -34,35 +34,33 @@ public class TaskAssignmentService {
             throw new IllegalArgumentException("Nessun dipendente attualmente in turno per assegnare i task.");
         }
 
-        // Recupera il carico iniziale di lavoro (1 singola query per ogni dipendente, invece di N)
-        Map<String, Long> caricoDiLavoro = new HashMap<>(); //quanti task "DA_FARE" ha attualmente il dipendente?
-        Map<String, Long> ultimiTaskCompletati = new HashMap<>(); //qual è l'id dell'ultimo task che ha completato?
+        // FASE 2: Bilanciamento Dinamico
+        Map<String, Double> caricoAttivoKg = new HashMap<>(); 
+        Map<String, Long> numeroTaskAttivi = new HashMap<>(); 
         
         for (Utenti u : dipendentiAttivi) {
-            caricoDiLavoro.put(u.getEmail(), taskRepository.countTaskAttiviPerDipendente(u.getEmail()));
-            ultimiTaskCompletati.put(u.getEmail(), getLastCompletedTaskId(u.getEmail()));
+            Double kgAttivi = taskRepository.sumCaricoAttivoInKgPerDipendente(u.getEmail());
+            caricoAttivoKg.put(u.getEmail(), kgAttivi != null ? kgAttivi : 0.0);
+            numeroTaskAttivi.put(u.getEmail(), taskRepository.countTaskAttiviPerDipendente(u.getEmail()));
         }
 
-        for (Task task : nuoviTask) { //scorre la lista dei nuovi task da smistare e per ogni singolo task:
-            // Per ogni dipendente, cerca chi ha meno task (usando i dati in memoria)
+        for (Task task : nuoviTask) { 
+            float pesoUnitario = (task.getBatch_prodotti() != null && task.getBatch_prodotti().getProdotto() != null) 
+                                 ? task.getBatch_prodotti().getProdotto().getPesoUnitario() : 0f;
+            double pesoTask = task.getQta_spostata() * pesoUnitario;
+
             Utenti dipendenteScelto = dipendentiAttivi.stream()
-                .min(Comparator.comparingLong((Utenti u) -> caricoDiLavoro.get(u.getEmail())) //scorre tutti i dipendenti attivi alla ricerca di quello con il punteggio minore (quello più "scarico")
-                                                                                             //criterio 1: guardando l'hashmap in ram, chi ha il numero più basso di task vince
-                        .thenComparingLong(u -> ultimiTaskCompletati.get(u.getEmail())))//criterio 2: se c'è un pareggio, va a vedere chi ha il task id completato più grande. In questo modo l'algoritmo fa riposare chi ha lavorato per ultimo
-                .orElse(dipendentiAttivi.get(0)); //
+                .min(Comparator.comparingDouble((Utenti u) -> caricoAttivoKg.get(u.getEmail())) // priorità: Kg
+                        .thenComparingLong(u -> numeroTaskAttivi.get(u.getEmail()))) // tie-break: Num Task
+                .orElse(dipendentiAttivi.get(0));
 
             // crea l'assegnazione
-            TaskDip nuovaAssegnazione = new TaskDip(dipendenteScelto, task);//una volta trovato il dipendente giusto, si crea il legame tra questo e il task (tramite TaskDip) e lo salva nel DB.
+            TaskDip nuovaAssegnazione = new TaskDip(dipendenteScelto, task);
             taskDipRepository.save(nuovaAssegnazione);
             
-            // aggiorna il carico di lavoro IN MEMORIA per il bilanciamento del prossimo ciclo
-            caricoDiLavoro.put(dipendenteScelto.getEmail(), caricoDiLavoro.get(dipendenteScelto.getEmail()) + 1);
+            // Aggiornamento In Memoria
+            caricoAttivoKg.put(dipendenteScelto.getEmail(), caricoAttivoKg.get(dipendenteScelto.getEmail()) + pesoTask);
+            numeroTaskAttivi.put(dipendenteScelto.getEmail(), numeroTaskAttivi.get(dipendenteScelto.getEmail()) + 1L);
         }
-    }
-
-    private long getLastCompletedTaskId(String email) {
-        // Ritorna l'ID più grande tra i task completati. Se non ne ha, ritorna 0 (priorità massima per averne).
-        Long lastId = taskDipRepository.findMaxCompletedTaskIdByDipendenteEmail(email);
-        return lastId != null ? lastId : 0L;
     }
 }

@@ -18,5 +18,12 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     @Query("SELECT COUNT(td) FROM TaskDip td WHERE td.dipendente.email = :email AND td.task.stato_task != 'COMPLETATO'")
     long countTaskAttiviPerDipendente(@Param("email") String email);
 
-
+    @Query("SELECT COALESCE(SUM(td.task.qta_spostata * p.PesoUnitario), 0.0) " +
+           "FROM TaskDip td " +
+           "JOIN td.task t " +
+           "JOIN t.batch_prodotti b " +
+           "JOIN b.prodotto p " +
+           "WHERE td.dipendente.email = :email " +
+           "AND t.stato_task IN ('DA_FARE', 'IN_CARICO')")
+    Double sumCaricoAttivoInKgPerDipendente(@Param("email") String email);
 }
