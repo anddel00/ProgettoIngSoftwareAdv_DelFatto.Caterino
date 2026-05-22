@@ -72,18 +72,25 @@ public class BatchScaffaleService {
                 ).orElse(null);
 
                 if (esistente != null) {
-                    esistente.setQta(esistente.getQta() + dto.getQta());
-                    batchScaffaleRepository.save(esistente);
+                    int nuovaQta = esistente.getQta() + dto.getQta();
+                    if (nuovaQta <= 0) {
+                        batchScaffaleRepository.delete(esistente);
+                    } else {
+                        esistente.setQta(nuovaQta);
+                        batchScaffaleRepository.save(esistente);
+                    }
                 } else {
-                    BatchScaffale nuovo = new BatchScaffale(
-                        mappaRepository.findById(dto.getIdMappa()).orElseThrow(() -> new Exception("Mappa non trovata")),
-                        batchProdottiRepository.findById(dto.getIdBatchProdotti()).orElseThrow(() -> new Exception("Batch non trovato")),
-                        dto.getColonna(),
-                        dto.getRiga(),
-                        dto.getAltezza(),
-                        dto.getQta()
-                    );
-                    batchScaffaleRepository.save(nuovo);
+                    if (dto.getQta() > 0) {
+                        BatchScaffale nuovo = new BatchScaffale(
+                            mappaRepository.findById(dto.getIdMappa()).orElseThrow(() -> new Exception("Mappa non trovata")),
+                            batchProdottiRepository.findById(dto.getIdBatchProdotti()).orElseThrow(() -> new Exception("Batch non trovato")),
+                            dto.getColonna(),
+                            dto.getRiga(),
+                            dto.getAltezza(),
+                            dto.getQta()
+                        );
+                        batchScaffaleRepository.save(nuovo);
+                    }
                 }
                 lottiCoinvolti.add(dto.getIdBatchProdotti());
 

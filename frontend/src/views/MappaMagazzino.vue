@@ -25,6 +25,7 @@ const nuoviAssegnamenti = ref([]);
 const modifichePendenti = ref([]); 
 
 const lottoDaAssegnare = ref(null);
+const taskDaRiprogrammare = ref(null);
 const quantitaSelezionata = ref(1);
 const cellaSuggerita = ref(null);
 
@@ -442,7 +443,7 @@ const rimuoviDaCella = (elementoModale) => {
 };
 
 // --- GESTISCI CLICK SULLO SLOT E INSERIMENTO ---
-const gestisciClickCella = (cella, slotIndex) => {
+const gestisciClickCella = async (cella, slotIndex) => {
   if (isEditing.value) return;
 
   const pianoAttuale = getPiano(cella.id);
@@ -452,8 +453,11 @@ const gestisciClickCella = (cella, slotIndex) => {
   const colonnaLocale = ((slotIndex - 1) % (isOrizzontale ? info.max_righe : info.max_colonne));
 
   if (lottoDaAssegnare.value) {
-    if (quantitaSelezionata.value <= 0 || quantitaSelezionata.value > lottoDaAssegnare.value.quantita) {
-      alert("Quantità non valida!"); return;
+    if (quantitaSelezionata.value <= 0) {
+      alert("La quantità deve essere maggiore di zero."); return;
+    }
+    if (!taskDaRiprogrammare.value && quantitaSelezionata.value > lottoDaAssegnare.value.quantita) {
+      alert("Quantità non valida (superiore alla disponibilità del lotto)!"); return;
     }
 
     const prodotto = getProdottoDaBatch(lottoDaAssegnare.value.id);
@@ -468,6 +472,26 @@ const gestisciClickCella = (cella, slotIndex) => {
     const pesoAttuale = calcolaPesoOccupatoScaffale(cella.id);
     if (pesoAttuale + pesoRichiesto > (info.max_peso || 9999)) {
       alert(`Scaffale sovraccarico! Libero: ${(info.max_peso || 9999) - pesoAttuale} kg.`); return;
+    }
+
+    if (taskDaRiprogrammare.value) {
+      try {
+        await api.post('/api/tasks/riprogramma', {
+          idTaskOriginale: taskDaRiprogrammare.value.taskId,
+          idNuovoScaffale: cella.id,
+          nuovaX: colonnaLocale,
+          nuovaY: rigaLocale,
+          nuovaZ: pianoAttuale
+        });
+        alert("Task riprogrammato con successo!");
+        taskDaRiprogrammare.value = null;
+        lottoDaAssegnare.value = null;
+        window.location.reload();
+      } catch (error) {
+        console.error(error);
+        alert(error.response?.data?.message || error.response?.data || "Errore durante la riprogrammazione del task.");
+      }
+      return;
     }
 
     lottoDaAssegnare.value.quantita -= quantitaSelezionata.value;
@@ -666,6 +690,13 @@ const selezionaLotto = (lotto) => {
     lottoDaAssegnare.value = lotto;
     quantitaSelezionata.value = 1; 
   }
+};
+
+const riprogrammaTaskVisuale = (task) => {
+  taskDaRiprogrammare.value = task;
+  lottoDaAssegnare.value = task.lotto;
+  quantitaSelezionata.value = task.quantita;
+  alert(`Seleziona sulla mappa la nuova destinazione per il Task #${task.taskId}`);
 };
 
 const lottiDaSistemareFiltrati = computed(() => {
@@ -1150,9 +1181,14 @@ onMounted(async () => {
                   <span>{{ t.labelScaffaleFine || '—' }}</span>
                 </div>
               </div>
-              <div class="sistemi-dipendente">
-                <svg class="icon-tiny" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-                {{ t.nomeDipendente }}
+              <div class="sistemi-dipendente flex justify-between items-center w-full">
+                <div>
+                  <svg class="icon-tiny" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                  {{ t.nomeDipendente }}
+                </div>
+                <button @click="riprogrammaTaskVisuale(t)" class="btn-riprogramma" title="Cambia destinazione" style="background: none; border: none; cursor: pointer; color: #6366f1;">
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width: 16px; height: 16px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                </button>
               </div>
             </div>
           </template>
@@ -1200,9 +1236,14 @@ onMounted(async () => {
                   <span>{{ t.labelScaffaleFine || '—' }}</span>
                 </div>
               </div>
-              <div class="sistemi-dipendente">
-                <svg class="icon-tiny" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-                {{ t.nomeDipendente }}
+              <div class="sistemi-dipendente flex justify-between items-center w-full">
+                <div>
+                  <svg class="icon-tiny" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                  {{ t.nomeDipendente }}
+                </div>
+                <button @click="riprogrammaTaskVisuale(t)" class="btn-riprogramma" title="Cambia destinazione" style="background: none; border: none; cursor: pointer; color: #10b981;">
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width: 16px; height: 16px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                </button>
               </div>
             </div>
           </template>

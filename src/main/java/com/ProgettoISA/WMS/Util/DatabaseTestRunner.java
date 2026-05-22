@@ -226,5 +226,19 @@ public class DatabaseTestRunner implements CommandLineRunner {
         } catch (Exception e) {
             System.out.println("ℹ️ Database già popolato o utente presente.");
         }
+
+        try {
+            Utenti dipendente = new Utenti();
+            dipendente.setNome("Andrea");
+            dipendente.setUsername("andel");
+            dipendente.setCognome("Del Fatto");
+            dipendente.setData_nascita(new Date());
+            dipendente.setEmail("andrea@wms.it");
+            dipendente.setPassword("andrea123");
+            utentiService.registraUtente(dipendente, "Dipendente");
+            System.out.println("✅ Dipendente creato: andrea@wms.it / andrea123");
+        } catch (Exception e) {
+            System.out.println("ℹ️ Database già popolato o utente presente.");
+        }
     }
 }

@@ -2,6 +2,7 @@ package com.ProgettoISA.WMS.Controller;
 
 import com.ProgettoISA.WMS.DTO.AdminStoricoTaskDTO;
 import com.ProgettoISA.WMS.DTO.CreaTaskDTO;
+import com.ProgettoISA.WMS.DTO.RiprogrammaTaskDTO;
 import com.ProgettoISA.WMS.DTO.TaskDTO;
 import com.ProgettoISA.WMS.Model.TaskDip;
 import com.ProgettoISA.WMS.Repository.TaskDipRepository;
@@ -53,6 +54,22 @@ public class TaskController {
             return ResponseEntity.badRequest().body(e.getMessage());
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Errore nella creazione e assegnazione dei task.");
+        }
+    }
+
+    // ==========================================
+    // 1C. RIPROGRAMMAZIONE VISUALE TASK
+    // POST /api/tasks/riprogramma
+    // ==========================================
+    @PostMapping("/riprogramma")
+    public ResponseEntity<?> riprogrammaTask(@RequestBody RiprogrammaTaskDTO dto) {
+        try {
+            List<TaskDTO> tasksCreati = taskService.riprogrammaTask(dto);
+            return ResponseEntity.ok(tasksCreati);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Errore nella riprogrammazione del task.");
         }
     }
 

@@ -11,6 +11,7 @@ import com.ProgettoISA.WMS.Repository.UtentiRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.ProgettoISA.WMS.DTO.RiprogrammaTaskDTO;
 
 import org.springframework.messaging.simp.SimpMessageSendingOperations;
 
@@ -366,5 +367,48 @@ public class TaskService {
             messagingTemplate.convertAndSend(canalePrivato, taskAnnullatoDto);
         }
         messagingTemplate.convertAndSend("/topic/tasks", taskAnnullatoDto);
+    }
+
+    // ==========================================
+    // 6. RIPROGRAMMAZIONE VISUALE DEL TASK
+    // ==========================================
+    @Transactional(rollbackFor = Exception.class)
+    public List<TaskDTO> riprogrammaTask(RiprogrammaTaskDTO dto) {
+        // 1. Recuperare il task originale dal DB
+        Task taskOriginale = taskRepository.findById(dto.getIdTaskOriginale())
+                .orElseThrow(() -> new IllegalArgumentException("Task originale non trovato con id: " + dto.getIdTaskOriginale()));
+
+        if ("COMPLETATO".equals(taskOriginale.getStato_task()) || "ANNULLATO".equals(taskOriginale.getStato_task())) {
+            throw new IllegalArgumentException("Impossibile riprogrammare un task completato o già annullato.");
+        }
+
+        // 2. Costruire il DTO di creazione con i dati originali
+        CreaTaskDTO nuovoCreaTaskDTO = new CreaTaskDTO();
+        nuovoCreaTaskDTO.setDescrizione(taskOriginale.getDescrizione() + " (Riprogrammato)");
+        nuovoCreaTaskDTO.setTipoTask(taskOriginale.getTipo_task());
+        nuovoCreaTaskDTO.setQuantita(taskOriginale.getQta_spostata());
+        
+        if (taskOriginale.getBatch_prodotti() != null) {
+            nuovoCreaTaskDTO.setIdBatch(taskOriginale.getBatch_prodotti().getId());
+        }
+        
+        if (taskOriginale.getScaffale_inizio() != null) {
+            nuovoCreaTaskDTO.setIdScaffaleInizio(taskOriginale.getScaffale_inizio().getId());
+            nuovoCreaTaskDTO.setVecchiaX(taskOriginale.getVecchia_x());
+            nuovoCreaTaskDTO.setVecchiaY(taskOriginale.getVecchia_y());
+            nuovoCreaTaskDTO.setVecchiaZ(taskOriginale.getVecchia_z());
+        }
+
+        // 3. Impostare la nuova destinazione fornita dal dto
+        nuovoCreaTaskDTO.setIdScaffaleFine(dto.getIdNuovoScaffale());
+        nuovoCreaTaskDTO.setNuovaX(dto.getNuovaX());
+        nuovoCreaTaskDTO.setNuovaY(dto.getNuovaY());
+        nuovoCreaTaskDTO.setNuovaZ(dto.getNuovaZ());
+
+        // 4. Annullare fisicamente/logicamente il task originale
+        annullaTask(taskOriginale.getId());
+
+        // 5. Creare il nuovo task passando dalla logica di splitting e assegnamento
+        return creaEAssegnaMultipli(List.of(nuovoCreaTaskDTO));
     }
 }
