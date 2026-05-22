@@ -108,7 +108,7 @@ public class DatabaseTestRunner implements CommandLineRunner {
             List<Reparti> repartiIniziali = List.of(
                     new Reparti(15L, 15L, -20L, "Surgelati"),
                     new Reparti(20L, 20L, 3L, "Fresco"),
-                    new Reparti(30L, 30L, 15L, "Secco")
+                    new Reparti(20L, 20L, 15L, "Secco")
             );
 
             repartiRepository.saveAll(repartiIniziali);
@@ -146,68 +146,68 @@ public class DatabaseTestRunner implements CommandLineRunner {
                 System.out.println("✅ Mappa e Scaffali generati con corridoio dinamico!");
 
                 // =================================================================
-                // 🧪 STRESS TEST COMPLETO: GENERAZIONE DEI BATCH E ABBINAMENTO CELLE
+                // 🧪 STRESS TEST COMPLETO: GENERAZIONE DEI BATCH E ABBINAMENTO CELLE - Decommentare per riempire Reparti e Scaffali
                 // =================================================================
-                System.out.println("🧪 Generazione lotti logici e fisici per lo Stress Test...");
-                List<Prodotti> tuttiIProdotti = prodottiRepository.findAll();
-
-                if (!tuttiIProdotti.isEmpty()) {
-                    List<BatchProdotti> lottiDaSalvare = new ArrayList<>();
-                    LocalDate scadenzaFittizia = LocalDate.now().plusMonths(6);
-                    int prodottoIndex = 0;
-
-                    // Fase A: Generiamo un'entità BatchProdotti per ogni singola coordinata spaziale (Righe x Colonne x Altezza)
-                    for (Mappa mappa : mappeSalvate) {
-                        Scaffali scaffale = mappa.getScaffale();
-
-                        for (int r = 0; r < scaffale.getMax_righe(); r++) {
-                            for (int c = 0; c < scaffale.getMax_colonne(); c++) {
-                                for (int h = 0; h < scaffale.getMax_altezza(); h++) {
-                                    Prodotti pScelto = tuttiIProdotti.get(prodottoIndex % tuttiIProdotti.size());
-                                    prodottoIndex++;
-
-                                    BatchProdotti bp = new BatchProdotti(pScelto, 100, scadenzaFittizia);
-                                    lottiDaSalvare.add(bp);
-                                }
-                            }
-                        }
-                    }
-
-                    // Salviamo massivamente a DB per generare gli ID univoci stabili dei lotti logici
-                    List<BatchProdotti> lottiSalvati = batchProdottiRepository.saveAll(lottiDaSalvare);
-
-                    // Fase B: Abbiniamo i lotti logici salvati alla griglia di giacenza fisica (BatchScaffale)
-                    List<BatchScaffale> relazioniGiacenza = new ArrayList<>();
-                    int lottoCounter = 0;
-
-                    for (Mappa mappa : mappeSalvate) {
-                        Scaffali scaffale = mappa.getScaffale();
-
-                        // Controllo dell'orientamento per allinearci alla logica del Frontend
-                        boolean isOrizzontale = mappa.getOrientamentoScaffale().equals("ORIZZONTALE");
-
-                        for (int r = 0; r < scaffale.getMax_righe(); r++) {
-                            for (int c = 0; c < scaffale.getMax_colonne(); c++) {
-                                for (int h = 0; h < scaffale.getMax_altezza(); h++) {
-                                    BatchProdotti lottoCorrente = lottiSalvati.get(lottoCounter);
-                                    lottoCounter++;
-
-                                    // IL TRUCCO: Invertiamo le coordinate se lo scaffale è orizzontale,
-                                    // in modo che il frontend trovi i dati dove si aspetta!
-                                    int colonnaEffettiva = isOrizzontale ? r : c;
-                                    int rigaEffettiva = isOrizzontale ? c : r;
-
-                                    BatchScaffale bs = new BatchScaffale(mappa, lottoCorrente, colonnaEffettiva, rigaEffettiva, h, 100/lottoCorrente.getProdotto().getSpazioUnitario().intValue());
-                                    relazioniGiacenza.add(bs);
-                                }
-                            }
-                        }
-                    }
-
-                    // Scrittura massiva finale ad alte prestazioni delle giacenze fisiche
-                    batchScaffaleRepository.saveAll(relazioniGiacenza);
-                    System.out.println("✅ STRESS TEST PRONTO: " + relazioniGiacenza.size() + " celle riempite al 100%!");
-                }
+//                System.out.println("🧪 Generazione lotti logici e fisici per lo Stress Test...");
+//                List<Prodotti> tuttiIProdotti = prodottiRepository.findAll();
+//
+//                if (!tuttiIProdotti.isEmpty()) {
+//                    List<BatchProdotti> lottiDaSalvare = new ArrayList<>();
+//                    LocalDate scadenzaFittizia = LocalDate.now().plusMonths(6);
+//                    int prodottoIndex = 0;
+//
+//                    // Fase A: Generiamo un'entità BatchProdotti per ogni singola coordinata spaziale (Righe x Colonne x Altezza)
+//                    for (Mappa mappa : mappeSalvate) {
+//                        Scaffali scaffale = mappa.getScaffale();
+//
+//                        for (int r = 0; r < scaffale.getMax_righe(); r++) {
+//                            for (int c = 0; c < scaffale.getMax_colonne(); c++) {
+//                                for (int h = 0; h < scaffale.getMax_altezza(); h++) {
+//                                    Prodotti pScelto = tuttiIProdotti.get(prodottoIndex % tuttiIProdotti.size());
+//                                    prodottoIndex++;
+//
+//                                    BatchProdotti bp = new BatchProdotti(pScelto, 100, scadenzaFittizia);
+//                                    lottiDaSalvare.add(bp);
+//                                }
+//                            }
+//                        }
+//                    }
+//
+//                    // Salviamo massivamente a DB per generare gli ID univoci stabili dei lotti logici
+//                    List<BatchProdotti> lottiSalvati = batchProdottiRepository.saveAll(lottiDaSalvare);
+//
+//                    // Fase B: Abbiniamo i lotti logici salvati alla griglia di giacenza fisica (BatchScaffale)
+//                    List<BatchScaffale> relazioniGiacenza = new ArrayList<>();
+//                    int lottoCounter = 0;
+//
+//                    for (Mappa mappa : mappeSalvate) {
+//                        Scaffali scaffale = mappa.getScaffale();
+//
+//                        // Controllo dell'orientamento per allinearci alla logica del Frontend
+//                        boolean isOrizzontale = mappa.getOrientamentoScaffale().equals("ORIZZONTALE");
+//
+//                        for (int r = 0; r < scaffale.getMax_righe(); r++) {
+//                            for (int c = 0; c < scaffale.getMax_colonne(); c++) {
+//                                for (int h = 0; h < scaffale.getMax_altezza(); h++) {
+//                                    BatchProdotti lottoCorrente = lottiSalvati.get(lottoCounter);
+//                                    lottoCounter++;
+//
+//                                    // IL TRUCCO: Invertiamo le coordinate se lo scaffale è orizzontale,
+//                                    // in modo che il frontend trovi i dati dove si aspetta!
+//                                    int colonnaEffettiva = isOrizzontale ? r : c;
+//                                    int rigaEffettiva = isOrizzontale ? c : r;
+//
+//                                    BatchScaffale bs = new BatchScaffale(mappa, lottoCorrente, colonnaEffettiva, rigaEffettiva, h, 100/lottoCorrente.getProdotto().getSpazioUnitario().intValue());
+//                                    relazioniGiacenza.add(bs);
+//                                }
+//                            }
+//                        }
+//                    }
+//
+//                    // Scrittura massiva finale ad alte prestazioni delle giacenze fisiche
+//                    batchScaffaleRepository.saveAll(relazioniGiacenza);
+//                    System.out.println("✅ STRESS TEST PRONTO: " + relazioniGiacenza.size() + " celle riempite al 100%!");
+//                }
             }
         }
 
