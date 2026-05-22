@@ -29,4 +29,8 @@ public interface BatchScaffaleRepository extends JpaRepository<BatchScaffale, Lo
     // JOIN esplicito per evitare N+1 query su mappa e reparto
     @Query("SELECT b FROM BatchScaffale b JOIN b.mappa m WHERE m.reparto.id = :idReparto")
     List<BatchScaffale> findByMappaRepartoId(@Param("idReparto") Long idReparto);
+
+    // 4. Eager fetch per le posizioni del Catalogo Lotti (Evita problema N+1)
+    @Query("SELECT bs FROM BatchScaffale bs JOIN FETCH bs.mappa m JOIN FETCH m.reparto r WHERE bs.batch_prodotti.id IN :batchIds")
+    List<BatchScaffale> findByBatchIdsWithMappaAndReparto(@Param("batchIds") List<Long> batchIds);
 }

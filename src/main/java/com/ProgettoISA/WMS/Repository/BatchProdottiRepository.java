@@ -18,11 +18,22 @@ public interface BatchProdottiRepository extends JpaRepository<BatchProdotti, Lo
     @Query("SELECT DISTINCT bs.batch_prodotti FROM BatchScaffale bs WHERE bs.mappa.reparto.id = :idReparto")
     List<BatchProdotti> findByReparto(@Param("idReparto") Long idReparto);
 
-    /**
-     * LAZY LOADING (Query 2): Batch che NON hanno NESSUN BatchScaffale associato
-     * (completamente sospesi, mai assegnati a nessuno scaffale in nessun reparto).
-     */
     @Query("SELECT bp FROM BatchProdotti bp WHERE bp.id NOT IN (SELECT DISTINCT bs.batch_prodotti.id FROM BatchScaffale bs)")
     List<BatchProdotti> findCompletamenteSospesi();
 
+    // Server-Side Pagination per il Catalogo Lotti (Ricerca Avanzata)
+    @Query("SELECT DISTINCT bp FROM BatchProdotti bp " +
+           "LEFT JOIN bp.prodotto p " +
+           "LEFT JOIN EtProd ep ON ep.prodotto = p " +
+           "WHERE LOWER(p.nome) LIKE LOWER(CONCAT('%', :nomeProdotto, '%')) " +
+           "AND (:idCategoria IS NULL OR ep.etichetta.id = :idCategoria) " +
+           "AND (:statoSistemazione IS NULL " +
+           "     OR (:statoSistemazione = 'SISTEMATI' AND EXISTS (SELECT 1 FROM BatchScaffale bs WHERE bs.batch_prodotti = bp)) " +
+           "     OR (:statoSistemazione = 'ATTESA' AND NOT EXISTS (SELECT 1 FROM BatchScaffale bs WHERE bs.batch_prodotti = bp)))")
+    org.springframework.data.domain.Page<BatchProdotti> findByFiltriAvanzati(
+        @org.springframework.data.repository.query.Param("nomeProdotto") String nomeProdotto, 
+        @org.springframework.data.repository.query.Param("idCategoria") Long idCategoria, 
+        @org.springframework.data.repository.query.Param("statoSistemazione") String statoSistemazione, 
+        org.springframework.data.domain.Pageable pageable
+    );
 }

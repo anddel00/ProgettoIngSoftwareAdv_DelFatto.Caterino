@@ -11,6 +11,7 @@ import StoricoMovimenti from "./views/StoricoMovimenti.vue";
 import GestioneTask from "./views/GestioneTask.vue";
 import GestioneTurni from './views/GestioneTurni.vue';
 import MappaMagazzino from './views/MappaMagazzino.vue';
+import CatalogoBatch from './views/CatalogoBatch.vue';
 
 
 // 2. Rotte
@@ -59,6 +60,11 @@ const routes = [
         path: '/GestioneTurni',
         name: 'GestioneTurni',
         component: GestioneTurni
+    },
+    {
+        path: '/admin/catalogo',
+        name: 'CatalogoBatch',
+        component: CatalogoBatch
     },
     {
         path: '/Mappa/reparto/:id', // Parametro dinamico per l'ID del reparto

@@ -108,4 +108,43 @@ public class BatchProdottiService {
         )).collect(Collectors.toList());
     }
 
+    public org.springframework.data.domain.Page<com.ProgettoISA.WMS.DTO.CatalogoBatchDTO> getCatalogoLottiAvanzato(
+            String search, Long idCategoria, String statoSistemazione, org.springframework.data.domain.Pageable pageable, 
+            com.ProgettoISA.WMS.Repository.BatchScaffaleRepository batchScaffaleRepository) {
+        
+        // 1. Recupera la pagina di lotti filtrata
+        org.springframework.data.domain.Page<BatchProdotti> pageBatch = 
+            batchProdottiRepository.findByFiltriAvanzati(search, idCategoria, statoSistemazione, pageable);
+        
+        // 2. Estrai gli ID dei lotti nella pagina corrente
+        List<Long> batchIds = pageBatch.getContent().stream()
+            .map(BatchProdotti::getId)
+            .collect(Collectors.toList());
+            
+        // 3. Esegui UNA SOLA query per recuperare tutte le posizioni fisiche
+        List<com.ProgettoISA.WMS.Model.BatchScaffale> posizioniFisiche = new ArrayList<>();
+        if (!batchIds.isEmpty()) {
+            posizioniFisiche = batchScaffaleRepository.findByBatchIdsWithMappaAndReparto(batchIds);
+        }
+        
+        // 4. Mappa i risultati (Group By Batch ID in memoria per evitare N+1)
+        java.util.Map<Long, List<String>> mapPosizioni = new java.util.HashMap<>();
+        for (com.ProgettoISA.WMS.Model.BatchScaffale bs : posizioniFisiche) {
+            String posStr = "Reparto " + bs.getMappa().getReparto().getNome() + 
+                            " - Sc. " + bs.getMappa().getId() + 
+                            " (R:" + bs.getRiga() + ", C:" + bs.getColonna() + ") - " + 
+                            bs.getQta() + "pz";
+            
+            mapPosizioni.computeIfAbsent(bs.getBatch_prodotti().getId(), k -> new ArrayList<>()).add(posStr);
+        }
+        
+        // 5. Costruisci i DTO finali
+        return pageBatch.map(bp -> new com.ProgettoISA.WMS.DTO.CatalogoBatchDTO(
+            bp.getId(),
+            bp.getProdotto() != null ? bp.getProdotto().getNome() : "N/A",
+            bp.getQta(),
+            bp.getScadenza(),
+            mapPosizioni.getOrDefault(bp.getId(), new ArrayList<>())
+        ));
+    }
 }
