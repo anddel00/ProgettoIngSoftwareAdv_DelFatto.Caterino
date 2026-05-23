@@ -60,6 +60,9 @@ public class TaskControllerIT {
     // ==========================================
     @Test
     void creaEAssegna_EndToEnd_Successo() throws Exception {
+        long taskCountPrima = taskRepository.count();
+        long taskDipCountPrima = taskDipRepository.count();
+        
         // Arrange: prepariamo il JSON da inviare
         CreaTaskDTO dto = new CreaTaskDTO();
         dto.setDescrizione("Task di Integrazione");
@@ -75,8 +78,10 @@ public class TaskControllerIT {
                 .andExpect(jsonPath("$.descrizione").value("Task di Integrazione"));
 
         // Verifiche DB: Andiamo a vedere se Hibernate ha scritto le tabelle!
-        assertEquals(1, taskRepository.findAll().size(), "Il task doveva essere salvato nel DB!");
-        assertEquals(1, taskDipRepository.findAll().size(), "Il collegamento TaskDip doveva essere salvato!");
+        long taskCountDopo = taskRepository.count();
+        long taskDipCountDopo = taskDipRepository.count();
+        assertEquals(taskCountPrima + 1, taskCountDopo, "Il task doveva essere salvato nel DB!");
+        assertEquals(taskDipCountPrima + 1, taskDipCountDopo, "Il collegamento TaskDip doveva essere salvato!");
     }
 
     // ==========================================
@@ -84,6 +89,9 @@ public class TaskControllerIT {
     // ==========================================
     @Test
     void creaEAssegna_EndToEnd_BloccaQuantitaNegative() throws Exception {
+        long taskCountPrima = taskRepository.count();
+        long taskDipCountPrima = taskDipRepository.count();
+        
         // Arrange: proviamo a ingannare il server
         CreaTaskDTO dto = new CreaTaskDTO();
         dto.setDescrizione("Task Malevolo");
@@ -99,7 +107,9 @@ public class TaskControllerIT {
                 .andExpect(content().string("Errore di sicurezza: La quantità deve essere maggiore di zero."));
 
         // Verifiche DB: Il database NON deve essere stato toccato
-        assertEquals(0, taskRepository.findAll().size(), "Il DB non doveva essere modificato!");
-        assertEquals(0, taskDipRepository.findAll().size());
+        long taskCountDopo = taskRepository.count();
+        long taskDipCountDopo = taskDipRepository.count();
+        assertEquals(taskCountPrima, taskCountDopo, "Il DB non doveva essere modificato!");
+        assertEquals(taskDipCountPrima, taskDipCountDopo);
     }
 }
