@@ -32,7 +32,8 @@ watch(ultimoTaskRicevuto, (nuovoTask) => {
         nomeDipendente: nuovoTask.nomeDipendente || 'Operatore',
         tipoTask: nuovoTask.tipoTask,
         descrizione: nuovoTask.descrizione,
-        quantita: nuovoTask.quantita || nuovoTask.qtaSpostata
+        quantita: nuovoTask.quantita || nuovoTask.qtaSpostata,
+        idMissione: nuovoTask.idMissione
       }
       storico.value = [taskStorico, ...storico.value]
     }
@@ -48,7 +49,10 @@ const storicoFiltrato = computed(() => {
 
   return storico.value.filter(record => {
     // 1. Logica Categoria
-    const matchesTipo = filtroTipo.value === 'TUTTI' || record.tipoTask === filtroTipo.value
+    let matchesTipo = false
+    if (filtroTipo.value === 'TUTTI') matchesTipo = true
+    else if (filtroTipo.value === 'USCITA/ORDINI') matchesTipo = (record.idMissione != null || record.tipoTask === 'USCITA')
+    else matchesTipo = (record.tipoTask === filtroTipo.value)
 
     // 2. Logica Ricerca Testuale
     const idValido = (record.idTask || record.id || '').toString().toLowerCase();
@@ -59,6 +63,16 @@ const storicoFiltrato = computed(() => {
 
     return matchesTipo && matchesQuery
   })
+})
+
+const storicoFiltratoRaggruppato = computed(() => {
+  const result = {};
+  storicoFiltrato.value.forEach(record => {
+    const key = record.idMissione || 'Task Singoli';
+    if (!result[key]) result[key] = [];
+    result[key].push(record);
+  });
+  return result;
 })
 
 onMounted(() => {
@@ -76,6 +90,7 @@ const getPercorso = (record) => {
   const fine   = labelScaffale(record.idScaffaleFine,   record.nuovaY,  record.nuovaX,  record.nuovaZ)
   if (record.tipoTask === 'SPOSTAMENTO') return { da: inizio || '—', a: fine || '—', tipo: 'sposta' }
   if (record.tipoTask === 'PRELIEVO')    return { da: inizio || '—', a: 'In attesa', tipo: 'preleva' }
+  if (record.tipoTask === 'USCITA')      return { da: inizio || '—', a: 'In uscita', tipo: 'preleva' }
   if (record.tipoTask === 'DEPOSITO')    return { da: 'In attesa', a: fine || '—',   tipo: 'deposita' }
   return { da: '—', a: '—', tipo: '' }
 }
@@ -114,7 +129,7 @@ const getPercorso = (record) => {
 
             <div class="header-section center">
               <div class="filter-group">
-                <button v-for="tipo in ['TUTTI', 'PRELIEVO', 'SPOSTAMENTO', 'DEPOSITO']"
+                <button v-for="tipo in ['TUTTI', 'USCITA/ORDINI', 'PRELIEVO', 'SPOSTAMENTO', 'DEPOSITO']"
                         :key="tipo"
                         @click="filtroTipo = tipo"
                         :disabled="filtroTipo === tipo"
@@ -150,34 +165,46 @@ const getPercorso = (record) => {
                 <th>Stato</th>
               </tr>
               </thead>
-              <tbody>
-              <tr v-for="record in storicoFiltrato" :key="record.idTask || record.id">
-                <td class="id-cell">#TSK-{{ record.idTask || record.id }}</td>
-                <td class="user-cell">
-                  <div class="user-avatar-small">{{ record.nomeDipendente ? record.nomeDipendente.charAt(0) : 'O' }}</div>
-                  <strong>{{ record.nomeDipendente || 'Operatore' }}</strong>
-                </td>
-                <td>
-                    <span class="task-type" :class="record.tipoTask === 'PRELIEVO' ? 'pickup' : record.tipoTask === 'DEPOSITO' ? 'dropoff' : 'move'">
-                      {{ record.tipoTask }}
-                    </span>
-                </td>
-                <!-- COLONNA PERCORSO -->
-                <td class="route-cell">
-                  <div class="route-wrap" :class="'route-' + getPercorso(record).tipo">
-                    <span class="route-slot">{{ getPercorso(record).da }}</span>
-                    <svg class="route-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
-                    <span class="route-slot" :class="{'route-attesa': getPercorso(record).a === 'In attesa' || getPercorso(record).da === 'In attesa'}">{{ getPercorso(record).a }}</span>
-                  </div>
-                </td>
-                <!-- COLONNA REPARTO -->
-                <td>
-                  <span v-if="record.nomeReparto" class="reparto-badge">{{ record.nomeReparto }}</span>
-                  <span v-else class="text-muted">&mdash;</span>
-                </td>
-                <td><strong>{{ record.quantita || record.qtaSpostata }}</strong></td>
-                <td><span class="glass-badge badge-success">Completato</span></td>
-              </tr>
+              <tbody v-for="(records, idMissione) in storicoFiltratoRaggruppato" :key="idMissione">
+                <tr v-if="idMissione !== 'Task Singoli'" class="mission-group-header">
+                  <td colspan="7">
+                    <div class="mission-header-content">
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                      <strong>Missione: {{ idMissione }}</strong>
+                      <span class="mission-operator"> — Assegnata a: <strong>{{ records[0].nomeDipendente || 'Operatore' }}</strong></span>
+                    </div>
+                  </td>
+                </tr>
+                <tr v-for="record in records" :key="record.idTask || record.id" :class="{'nested-row': idMissione !== 'Task Singoli'}">
+                  <td class="id-cell">#TSK-{{ record.idTask || record.id }}</td>
+                  <td class="user-cell">
+                    <span v-if="idMissione !== 'Task Singoli'" class="text-muted" style="opacity: 0.5;">↳ Gruppo</span>
+                    <template v-else>
+                      <div class="user-avatar-small">{{ record.nomeDipendente ? record.nomeDipendente.charAt(0) : 'O' }}</div>
+                      <strong>{{ record.nomeDipendente || 'Operatore' }}</strong>
+                    </template>
+                  </td>
+                  <td>
+                      <span class="task-type" :class="['PRELIEVO', 'USCITA'].includes(record.tipoTask) ? 'pickup' : record.tipoTask === 'DEPOSITO' ? 'dropoff' : 'move'">
+                        {{ record.tipoTask }}
+                      </span>
+                  </td>
+                  <!-- COLONNA PERCORSO -->
+                  <td class="route-cell">
+                    <div class="route-wrap" :class="'route-' + getPercorso(record).tipo">
+                      <span class="route-slot">{{ getPercorso(record).da }}</span>
+                      <svg class="route-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+                      <span class="route-slot" :class="{'route-attesa': getPercorso(record).a === 'In attesa' || getPercorso(record).da === 'In attesa'}">{{ getPercorso(record).a }}</span>
+                    </div>
+                  </td>
+                  <!-- COLONNA REPARTO -->
+                  <td>
+                    <span v-if="record.nomeReparto" class="reparto-badge">{{ record.nomeReparto }}</span>
+                    <span v-else class="text-muted">&mdash;</span>
+                  </td>
+                  <td><strong>{{ record.quantita || record.qtaSpostata }}</strong></td>
+                  <td><span class="glass-badge badge-success">Completato</span></td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -262,6 +289,18 @@ const getPercorso = (record) => {
 .glass-table td { padding: 16px 24px; border-bottom: 1px solid rgba(0,0,0,0.03); color: #334155; font-size: 14px; vertical-align: middle; }
 .glass-table tbody tr:hover { background: rgba(255,255,255,0.4); }
 .glass-table tbody tr:last-child td { border-bottom: none; }
+
+.mission-group-header { background: rgba(99, 102, 241, 0.05); border-top: 2px solid rgba(99, 102, 241, 0.2) !important; }
+.mission-group-header td { padding: 12px 24px !important; color: #4f46e5; border-bottom: 1px solid rgba(99, 102, 241, 0.1) !important; }
+.mission-header-content { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.mission-header-content svg { width: 18px; height: 18px; }
+.mission-operator { color: #64748b; font-weight: 500; margin-left: auto; }
+.mission-operator strong { color: #334155; }
+
+.nested-row td:first-child { padding-left: 40px; position: relative; }
+.nested-row td:first-child::before { content: ''; position: absolute; left: 24px; top: 50%; width: 10px; height: 1px; background: #cbd5e1; }
+.nested-row td:first-child::after { content: ''; position: absolute; left: 24px; top: 0; width: 1px; height: 100%; background: #cbd5e1; }
+.nested-row:last-child td:first-child::after { height: 50%; }
 
 .id-cell { color: #64748b; font-family: monospace; font-weight: 600; }
 .desc-cell { color: #0f172a; font-weight: 600; }

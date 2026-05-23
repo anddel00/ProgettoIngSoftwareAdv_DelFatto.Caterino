@@ -217,6 +217,15 @@ public class DatabaseTestRunner implements CommandLineRunner {
             }
         }
 
+        // --- MIGRATION: Fix lotti bloccati "IN_ATTESA" che in realtà sono già stoccati sugli scaffali ---
+        System.out.println("⏳ Verifica lotti stoccati ma con stato inconsistente...");
+        try {
+            batchProdottiRepository.aggiornaStatoLottiStoccati();
+            System.out.println("✅ Correzione lotti stoccati completata!");
+        } catch(Exception e) {
+            System.err.println("Errore durante l'aggiornamento dei lotti: " + e.getMessage());
+        }
+
         // 8. Creazione Utente Admin tramite Service (che gestisce BCrypt)
         try {
             Utenti admin = new Utenti();

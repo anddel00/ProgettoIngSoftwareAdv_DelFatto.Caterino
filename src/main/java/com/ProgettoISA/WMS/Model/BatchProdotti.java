@@ -40,11 +40,21 @@ public class BatchProdotti {
     @Column(name = "\"Scadenza\"", nullable = false)
     private LocalDate scadenza;
 
+    @Column(name = "\"statoLotto\"", nullable = false, columnDefinition = "varchar(255) default 'IN_ATTESA'")
+    private String statoLotto = "IN_ATTESA";
+
+    @Column(name = "\"Id_Ordine_Vendita\"")
+    private Long idOrdineVendita;
+
+    @Column(name = "\"Id_Lotto_Origine\"")
+    private Long idLottoOrigine;
+
     public BatchProdotti() {}
     public BatchProdotti(Prodotti prodotto, Integer qta, LocalDate scadenza) {
         this.prodotto = prodotto;
         this.qta = qta;
         this.scadenza = scadenza;
+        this.statoLotto = "IN_ATTESA";
     }
 
     public Long getId() {
@@ -87,5 +97,27 @@ public class BatchProdotti {
         return task;
     }
 
+    public String getStatoLotto() {
+        return statoLotto;
+    }
 
+    public void setStatoLotto(String statoLotto) {
+        this.statoLotto = statoLotto;
+    }
+
+    public Long getIdOrdineVendita() {
+        return idOrdineVendita;
+    }
+
+    public void setIdOrdineVendita(Long idOrdineVendita) {
+        this.idOrdineVendita = idOrdineVendita;
+    }
+
+    public Long getIdLottoOrigine() {
+        return idLottoOrigine;
+    }
+
+    public void setIdLottoOrigine(Long idLottoOrigine) {
+        this.idLottoOrigine = idLottoOrigine;
+    }
 }

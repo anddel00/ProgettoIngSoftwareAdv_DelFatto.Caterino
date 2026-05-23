@@ -22,7 +22,8 @@ let debounceTimeout = null
 const statoOptions = [
   { value: '', label: 'Tutti gli Stati' },
   { value: 'SISTEMATI', label: 'Sistemati' },
-  { value: 'ATTESA', label: 'In Attesa' }
+  { value: 'ATTESA', label: 'In Attesa' },
+  { value: 'VENDUTI', label: 'Storico Venduti' }
 ]
 
 const ordinamentoOptions = [
@@ -173,11 +174,12 @@ onMounted(() => {
                   <th>Posizione Fisica</th>
                   <th>Quantità</th>
                   <th>Scadenza</th>
+                  <th v-if="statoSistemazione === 'VENDUTI'">Ordine</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="lotto in lotti" :key="lotto.idLotto">
-                  <td>#L-{{ lotto.idLotto }}</td>
+                  <td><strong>#L-{{ lotto.idLottoOrigine || lotto.idLotto }}</strong></td>
                   <td><strong>{{ lotto.nomeProdotto }}</strong></td>
                   
                   <!-- POSIZIONE -->
@@ -190,7 +192,10 @@ onMounted(() => {
                       </div>
                     </template>
                     <template v-else>
-                      <span class="badge-in-attesa">
+                      <span v-if="statoSistemazione === 'VENDUTI'" class="badge-venduto">
+                        Venduto / Uscito
+                      </span>
+                      <span v-else class="badge-in-attesa">
                         In attesa di sistemazione
                       </span>
                     </template>
@@ -198,6 +203,12 @@ onMounted(() => {
 
                   <td>{{ lotto.quantitaDisponibile }}</td>
                   <td>{{ lotto.dataScadenza }}</td>
+                  
+                  <!-- COLONNE VENDUTI -->
+                  <td v-if="statoSistemazione === 'VENDUTI'">
+                    <span v-if="lotto.idOrdineVendita" class="ordine-badge">#ORD-{{ lotto.idOrdineVendita }}</span>
+                    <span v-else class="text-muted">&mdash;</span>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -304,6 +315,25 @@ onMounted(() => {
   color: #92400e; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 12px;
   display: inline-block;
 }
+.badge-venduto {
+  background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #991b1b; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 12px;
+  display: inline-block;
+}
+
+.ordine-badge {
+  background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.2);
+  color: #4338ca; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 8px;
+  display: inline-block; white-space: nowrap; font-family: monospace;
+}
+
+.lotto-origine-badge {
+  background: rgba(100, 116, 139, 0.1); border: 1px solid rgba(100, 116, 139, 0.2);
+  color: #475569; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 8px;
+  display: inline-block; white-space: nowrap; font-family: monospace;
+}
+
+.text-muted { color: #94a3b8; }
 
 .empty-state-glass {
   display: flex; flex-direction: column; align-items: center; justify-content: center;

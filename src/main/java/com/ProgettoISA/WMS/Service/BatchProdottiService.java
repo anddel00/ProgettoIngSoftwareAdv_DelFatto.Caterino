@@ -80,7 +80,8 @@ public class BatchProdottiService {
             bp.getId(),
             bp.getProdotto().getId(),
             bp.getQta(),
-            bp.getScadenza().toString()
+            bp.getScadenza().toString(),
+            bp.getIdLottoOrigine()
         )).collect(Collectors.toList());    
     }
 
@@ -104,7 +105,8 @@ public class BatchProdottiService {
             bp.getId(),
             bp.getProdotto().getId(),
             bp.getQta(),
-            bp.getScadenza().toString()
+            bp.getScadenza().toString(),
+            bp.getIdLottoOrigine()
         )).collect(Collectors.toList());
     }
 
@@ -132,19 +134,21 @@ public class BatchProdottiService {
         for (com.ProgettoISA.WMS.Model.BatchScaffale bs : posizioniFisiche) {
             String posStr = "Reparto " + bs.getMappa().getReparto().getNome() + 
                             " - Sc. " + bs.getMappa().getId() + 
-                            " (R:" + bs.getRiga() + ", C:" + bs.getColonna() + ") - " + 
+                            " (R:" + (bs.getRiga() + 1) + ", C:" + (bs.getColonna() + 1) + ") - " + 
                             bs.getQta() + "pz";
             
             mapPosizioni.computeIfAbsent(bs.getBatch_prodotti().getId(), k -> new ArrayList<>()).add(posStr);
         }
         
         // 5. Costruisci i DTO finali
-        return pageBatch.map(bp -> new com.ProgettoISA.WMS.DTO.CatalogoBatchDTO(
-            bp.getId(),
-            bp.getProdotto() != null ? bp.getProdotto().getNome() : "N/A",
-            bp.getQta(),
-            bp.getScadenza(),
-            mapPosizioni.getOrDefault(bp.getId(), new ArrayList<>())
+        return pageBatch.map(b -> new com.ProgettoISA.WMS.DTO.CatalogoBatchDTO(
+            b.getId(),
+            b.getProdotto() != null ? b.getProdotto().getNome() : "N/A",
+            b.getQta(),
+            b.getScadenza(),
+            mapPosizioni.getOrDefault(b.getId(), new ArrayList<>()),
+            b.getIdLottoOrigine(),
+            b.getIdOrdineVendita()
         ));
     }
 }

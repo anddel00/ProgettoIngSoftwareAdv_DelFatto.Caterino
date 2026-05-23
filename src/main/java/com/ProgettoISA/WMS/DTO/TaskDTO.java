@@ -7,9 +7,11 @@ public class TaskDTO {
     private String statoTask;
     private int quantita;
     private String nomeDipendente;
+    private String idMissione;
     
     // Campi aggiuntivi per la mappa
     private Long idBatch;
+    private Long idLottoOrigine;
     private Long idScaffaleInizio;
     private Long idScaffaleFine;
     private String nomeReparto;     // ricavato da scaffale_inizio.reparto (o scaffale_fine)
@@ -46,8 +48,14 @@ public class TaskDTO {
     public int getQuantita() { return quantita; }
     public String getNomeDipendente() { return nomeDipendente; }
 
+    public String getIdMissione() { return idMissione; }
+    public void setIdMissione(String idMissione) { this.idMissione = idMissione; }
+
     public Long getIdBatch() { return idBatch; }
     public void setIdBatch(Long idBatch) { this.idBatch = idBatch; }
+
+    public Long getIdLottoOrigine() { return idLottoOrigine; }
+    public void setIdLottoOrigine(Long idLottoOrigine) { this.idLottoOrigine = idLottoOrigine; }
 
     public Long getIdScaffaleInizio() { return idScaffaleInizio; }
     public void setIdScaffaleInizio(Long idScaffaleInizio) { this.idScaffaleInizio = idScaffaleInizio; }

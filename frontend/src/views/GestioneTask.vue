@@ -74,7 +74,11 @@ const taskAttiviLista = computed(() => tuttiTask.value.filter(t => t.statoTask !
 const taskFiltrati = computed(() => {
   const q = searchQuery.value.toLowerCase();
   return taskAttiviLista.value.filter(task => {
-    const matchesTipo = filtroTipo.value === 'TUTTI' || task.tipoTask === filtroTipo.value;
+    let matchesTipo = false;
+    if (filtroTipo.value === 'TUTTI') matchesTipo = true;
+    else if (filtroTipo.value === 'USCITA/ORDINI') matchesTipo = (task.idMissione != null || task.tipoTask === 'USCITA');
+    else matchesTipo = (task.tipoTask === filtroTipo.value);
+
     const matchesQuery = task.id.toString().includes(q) ||
         task.descrizione.toLowerCase().includes(q) ||
         task.statoTask.toLowerCase().includes(q) ||
@@ -82,6 +86,16 @@ const taskFiltrati = computed(() => {
 
     return matchesTipo && matchesQuery;
   });
+});
+
+const taskFiltratiRaggruppati = computed(() => {
+  const result = {};
+  taskFiltrati.value.forEach(task => {
+    const key = task.idMissione || 'Task Singoli';
+    if (!result[key]) result[key] = [];
+    result[key].push(task);
+  });
+  return result;
 });
 
 // ==========================================
@@ -154,6 +168,7 @@ const getPercorso = (task) => {
   const fine   = labelScaffale(task.idScaffaleFine,   task.nuovaY,  task.nuovaX,  task.nuovaZ)
   if (task.tipoTask === 'SPOSTAMENTO') return { da: inizio || '—', a: fine || '—', tipo: 'sposta' }
   if (task.tipoTask === 'PRELIEVO')    return { da: inizio || '—', a: 'In attesa', tipo: 'preleva' }
+  if (task.tipoTask === 'USCITA')      return { da: inizio || '—', a: 'In uscita', tipo: 'preleva' }
   if (task.tipoTask === 'DEPOSITO')    return { da: 'In attesa', a: fine || '—',   tipo: 'deposita' }
   return { da: '—', a: '—', tipo: '' }
 }
@@ -217,7 +232,7 @@ const getPercorso = (task) => {
 
             <div class="header-section center">
               <div class="filter-group">
-                <button v-for="tipo in ['TUTTI', 'PRELIEVO', 'SPOSTAMENTO', 'DEPOSITO']"
+                <button v-for="tipo in ['TUTTI', 'USCITA/ORDINI', 'PRELIEVO', 'SPOSTAMENTO', 'DEPOSITO']"
                         :key="tipo"
                         @click="filtroTipo = tipo"
                         :disabled="filtroTipo === tipo"
@@ -247,48 +262,62 @@ const getPercorso = (task) => {
                 <th>ID</th><th>Tipo</th><th>Qta</th><th>Percorso</th><th>Reparto</th><th>Assegnato a</th><th>Stato</th><th class="text-right">Azioni</th>
               </tr>
               </thead>
-              <tbody>
-              <tr v-for="task in taskFiltrati" :key="task.id">
-                <td class="id-cell">#TSK-{{ task.id }}</td>
-                <td>
-                    <span class="task-type" :class="task.tipoTask === 'PRELIEVO' ? 'pickup' : task.tipoTask === 'DEPOSITO' ? 'dropoff' : 'move'">
-                      {{ task.tipoTask }}
+              <tbody v-for="(tasks, idMissione) in taskFiltratiRaggruppati" :key="idMissione">
+                <!-- Intestazione Missione se non sono task singoli -->
+                <tr v-if="idMissione !== 'Task Singoli'" class="mission-group-header">
+                  <td colspan="8">
+                    <div class="mission-header-content">
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                      <strong>Missione: {{ idMissione }}</strong>
+                      <span class="mission-operator"> — Assegnata a: <strong>{{ tasks[0].nomeDipendente || 'Operatore' }}</strong></span>
+                    </div>
+                  </td>
+                </tr>
+                <!-- Task effettivi -->
+                <tr v-for="task in tasks" :key="task.id" :class="{'nested-row': idMissione !== 'Task Singoli'}">
+                  <td class="id-cell">#TSK-{{ task.id }}</td>
+                  <td>
+                      <span class="task-type" :class="['PRELIEVO', 'USCITA'].includes(task.tipoTask) ? 'pickup' : task.tipoTask === 'DEPOSITO' ? 'dropoff' : 'move'">
+                        {{ task.tipoTask }}
+                      </span>
+                  </td>
+                  <td><strong>{{ task.quantita }}</strong></td>
+
+                  <!-- COLONNA PERCORSO -->
+                  <td class="route-cell">
+                    <div class="route-wrap" :class="'route-' + getPercorso(task).tipo">
+                      <span class="route-slot route-from">{{ getPercorso(task).da }}</span>
+                      <svg class="route-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+                      <span class="route-slot route-to" :class="{'route-attesa': getPercorso(task).a === 'In attesa' || getPercorso(task).da === 'In attesa'}">{{ getPercorso(task).a }}</span>
+                    </div>
+                  </td>
+
+                  <!-- COLONNA REPARTO -->
+                  <td>
+                    <span v-if="task.nomeReparto" class="reparto-badge">{{ task.nomeReparto }}</span>
+                    <span v-else class="text-muted">&mdash;</span>
+                  </td>
+
+                  <td class="operator-cell">
+                    <span v-if="idMissione !== 'Task Singoli'" class="text-muted" style="opacity: 0.5;">↳ Gruppo</span>
+                    <span v-else>
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                      {{ task.nomeDipendente }}
                     </span>
-                </td>
-                <td><strong>{{ task.quantita }}</strong></td>
-
-                <!-- COLONNA PERCORSO -->
-                <td class="route-cell">
-                  <div class="route-wrap" :class="'route-' + getPercorso(task).tipo">
-                    <span class="route-slot route-from">{{ getPercorso(task).da }}</span>
-                    <svg class="route-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
-                    <span class="route-slot route-to" :class="{'route-attesa': getPercorso(task).a === 'In attesa' || getPercorso(task).da === 'In attesa'}">{{ getPercorso(task).a }}</span>
-                  </div>
-                </td>
-
-                <!-- COLONNA REPARTO -->
-                <td>
-                  <span v-if="task.nomeReparto" class="reparto-badge">{{ task.nomeReparto }}</span>
-                  <span v-else class="text-muted">&mdash;</span>
-                </td>
-
-                <td class="operator-cell">
-                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-                  {{ task.nomeDipendente }}
-                </td>
-                <td>
-                    <span class="stato-badge" :class="getStatoClass(task.statoTask)">
-                      {{ task.statoTask?.replace('_', ' ') }}
-                    </span>
-                </td>
-                <td class="action-cell">
-                  <button v-if="task.statoTask !== 'COMPLETATO' && task.statoTask !== 'ANNULLATO'" 
-                          @click="annullaTask(task.id)" 
-                          class="btn-delete-glass" title="Annulla Task">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                  </button>
-                </td>
-              </tr>
+                  </td>
+                  <td>
+                      <span class="stato-badge" :class="getStatoClass(task.statoTask)">
+                        {{ task.statoTask?.replace('_', ' ') }}
+                      </span>
+                  </td>
+                  <td class="action-cell">
+                    <button v-if="task.statoTask !== 'COMPLETATO' && task.statoTask !== 'ANNULLATO'" 
+                            @click="annullaTask(task.id)" 
+                            class="btn-delete-glass" title="Annulla Task">
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    </button>
+                  </td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -523,6 +552,18 @@ const getPercorso = (task) => {
 .glass-table td { padding: 16px 24px; border-bottom: 1px solid rgba(0,0,0,0.03); color: #334155; font-size: 14px; vertical-align: middle; }
 .glass-table tbody tr:hover { background: rgba(255,255,255,0.4); }
 .glass-table tbody tr:last-child td { border-bottom: none; }
+
+.mission-group-header { background: rgba(99, 102, 241, 0.05); border-top: 2px solid rgba(99, 102, 241, 0.2) !important; }
+.mission-group-header td { padding: 12px 24px !important; color: #4f46e5; border-bottom: 1px solid rgba(99, 102, 241, 0.1) !important; }
+.mission-header-content { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.mission-header-content svg { width: 18px; height: 18px; }
+.mission-operator { color: #64748b; font-weight: 500; margin-left: auto; }
+.mission-operator strong { color: #334155; }
+
+.nested-row td:first-child { padding-left: 40px; position: relative; }
+.nested-row td:first-child::before { content: ''; position: absolute; left: 24px; top: 50%; width: 10px; height: 1px; background: #cbd5e1; }
+.nested-row td:first-child::after { content: ''; position: absolute; left: 24px; top: 0; width: 1px; height: 100%; background: #cbd5e1; }
+.nested-row:last-child td:first-child::after { height: 50%; }
 
 .id-cell { color: #64748b; font-family: monospace; font-weight: 600; }
 .desc-cell { color: #0f172a; font-weight: 600; max-width: 300px; }

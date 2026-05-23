@@ -108,7 +108,7 @@ const taskIngressoIndex = computed(() => {
 const taskUscitaIndex = computed(() => {
   const map = new Map();
   for (const task of taskAttiviDati.value) {
-    if ((task.tipoTask === 'PRELIEVO' || task.tipoTask === 'SPOSTAMENTO') && task.idScaffaleInizio != null) {
+    if ((task.tipoTask === 'PRELIEVO' || task.tipoTask === 'USCITA' || task.tipoTask === 'SPOSTAMENTO') && task.idScaffaleInizio != null) {
       const key = `${task.idScaffaleInizio}-${task.vecchiaZ}-${task.vecchiaY}-${task.vecchiaX}`;
       if (!map.has(key)) map.set(key, []);
       map.get(key).push(task);
@@ -336,7 +336,7 @@ const apriModaleDettaglio = (cella, rigaLocale, colonnaLocale, pianoAttuale) => 
     Number(task.nuovaY) === Number(rigaLocale) && Number(task.nuovaX) === Number(colonnaLocale)
   );
   const merceInUscita = taskAttiviDati.value.filter(task => 
-    (task.tipoTask === 'PRELIEVO' || task.tipoTask === 'SPOSTAMENTO') &&
+    (task.tipoTask === 'PRELIEVO' || task.tipoTask === 'USCITA' || task.tipoTask === 'SPOSTAMENTO') &&
     Number(task.idScaffaleInizio) === Number(cella.id) && Number(task.vecchiaZ) === Number(pianoAttuale) &&
     Number(task.vecchiaY) === Number(rigaLocale) && Number(task.vecchiaX) === Number(colonnaLocale)
   );
@@ -350,6 +350,7 @@ const apriModaleDettaglio = (cella, rigaLocale, colonnaLocale, pianoAttuale) => 
       const batchInfo = tuttiIBatch.value.find(b => Number(b.id) === Number(item.idBatchProdotti));
       return {
         ...item, 
+        lottoOrigine: batchInfo ? batchInfo.idLottoOrigine : null,
         refOriginale: item, 
         batch: batchInfo, 
         prodotto: getProdottoDaBatch(item.idBatchProdotti),
@@ -736,20 +737,22 @@ const tasksInSistemazione = computed(() => {
         nomeDipendente: task.nomeDipendente || 'N/D',
         lotto,
         idLotto: task.idBatch,
-        nomeProdotto: lotto ? getNomeProdotto(lotto.idProdotto) : `Lotto #${task.idBatch}`,
+        nomeProdotto: lotto ? getNomeProdotto(lotto.idProdotto) : `Lotto #${task.idLottoOrigine || task.idBatch}`,
         labelScaffaleInizio: labelInizio,
         labelScaffaleFine: labelFine,
       };
     });
 });
 const tasksSpostamento = computed(() => tasksInSistemazione.value.filter(t => t.tipoTask === 'SPOSTAMENTO'));
-const tasksPrelievo    = computed(() => tasksInSistemazione.value.filter(t => t.tipoTask === 'PRELIEVO'));
+const tasksPrelievo    = computed(() => tasksInSistemazione.value.filter(t => t.tipoTask === 'PRELIEVO' || t.tipoTask === 'USCITA'));
 const tasksDeposito    = computed(() => tasksInSistemazione.value.filter(t => t.tipoTask === 'DEPOSITO'));
 
 const isProdottoCompatibileConReparto = (idProdotto, reparto) => {
-  const etichette = getEtichetteProdotto(idProdotto).map(e => e.nome.toLowerCase());
-  const repNome = (reparto.nome || "").toLowerCase();
+  const etichette = getEtichetteProdotto(idProdotto).map(e => (e.nome || e.Nome || "").toLowerCase());
+  const repNome = (reparto.nome || reparto.Nome || "").toLowerCase();
   
+  if (!repNome) return false;
+
   const isFresco = etichette.some(e => e.includes('fresc'));
   const isSurgelato = etichette.some(e => e.includes('surgelat'));
   const isAlcolico = etichette.some(e => e.includes('alcolic'));
@@ -1099,7 +1102,7 @@ onMounted(async () => {
             @click="selezionaLotto(mov.lotto); quantitaSelezionata = Math.min(mov.qtaMossa, mov.lotto.quantita)"
           >
             <div class="flex justify-between items-center mb-1">
-              <strong class="text-sm">Lotto #{{ mov.lotto.id }}</strong>
+              <strong class="text-sm">Lotto #{{ mov.lotto.idLottoOrigine || mov.lotto.id }}</strong>
               <span class="badge badge-arancio">{{ mov.qtaMossa }} pz</span>
             </div>
             <span class="movimento-nome-prod">{{ getNomeProdotto(mov.lotto.idProdotto) }}</span>
@@ -1119,7 +1122,7 @@ onMounted(async () => {
           <div v-for="lotto in lottiDaSistemareFiltrati" :key="lotto.id" class="batch-card" :class="{'selected': lottoDaAssegnare?.id === lotto.id}" @click="selezionaLotto(lotto)">
             <div class="batch-info">
               <div class="flex justify-between items-start">
-                <strong>Lotto #{{ lotto.id }}</strong>
+                <strong>Lotto #{{ lotto.idLottoOrigine || lotto.id }}</strong>
                 <span class="badge bg-blue-100 text-blue-800 font-bold">Disp: {{ lotto.quantita }} pz</span>
               </div>
               
@@ -1296,7 +1299,7 @@ onMounted(async () => {
               <div v-for="item in cellaDettaglioAttiva.elementi" :key="item.idBatchProdotti" class="lotto-modal-item" :class="{'border-l-4 border-yellow-500': item.isNuovo, 'border-l-4 border-blue-500': !item.isNuovo}">
 
                 <div class="flex justify-between items-center mb-1">
-                  <span class="font-bold">Lotto #{{ item.idBatchProdotti }}</span>
+                  <span class="font-bold">Lotto #{{ item.lottoOrigine || item.idBatchProdotti }}</span>
                   <span class="badge" :class="item.isNuovo ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'">
                     {{ item.isNuovo ? 'Nuovo' : 'Salvato' }}
                   </span>

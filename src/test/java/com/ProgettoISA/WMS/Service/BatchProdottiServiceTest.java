@@ -93,7 +93,7 @@ public class BatchProdottiServiceTest {
         
         List<String> posizioni = dto.getPosizioni();
         assertEquals(2, posizioni.size());
-        assertTrue(posizioni.contains("Reparto Surgelati - Sc. 5 (R:0, C:1) - 60pz"));
-        assertTrue(posizioni.contains("Reparto Surgelati - Sc. 5 (R:1, C:2) - 40pz"));
+        assertTrue(posizioni.contains("Reparto Surgelati - Sc. 5 (R:1, C:2) - 60pz"));
+        assertTrue(posizioni.contains("Reparto Surgelati - Sc. 5 (R:2, C:3) - 40pz"));
     }
 }

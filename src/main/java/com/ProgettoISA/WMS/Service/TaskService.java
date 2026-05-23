@@ -140,6 +140,8 @@ public class TaskService {
                 if (dto.getIdScaffaleFine() != null) {
                     nuovoTask.setScaffale_fine(mappaRepository.findById(dto.getIdScaffaleFine()).orElse(null));
                 }
+                
+                nuovoTask.setIdMissione(dto.getIdMissione());
 
                 nuoviTask.add(taskRepository.save(nuovoTask));
 
@@ -147,8 +149,18 @@ public class TaskService {
             }
         }
 
-        // Assegna automaticamente
-        taskAssignmentService.assegnaTasksAutomaticamente(nuoviTask);
+        // Assegna automaticamente: raggruppa per missione
+        java.util.Map<String, List<Task>> tasksByMission = nuoviTask.stream()
+            .collect(Collectors.groupingBy(t -> t.getIdMissione() != null ? t.getIdMissione() : "SINGOLI"));
+
+        for (java.util.Map.Entry<String, List<Task>> entry : tasksByMission.entrySet()) {
+            if ("SINGOLI".equals(entry.getKey())) {
+                taskAssignmentService.assegnaTasksAutomaticamente(entry.getValue());
+            } else {
+                taskAssignmentService.assegnaMissioneInBlocco(entry.getValue());
+            }
+        }
+
 
         // Prepariamo i DTO di risposta recuperando le assegnazioni appena fatte
         List<TaskDTO> responses = new java.util.ArrayList<>();
@@ -186,8 +198,12 @@ public class TaskService {
                 t.getQta_spostata(),
                 nomeCompleto
         );
+        dto.setIdMissione(t.getIdMissione());
         
-        if (t.getBatch_prodotti() != null) dto.setIdBatch(t.getBatch_prodotti().getId());
+        if (t.getBatch_prodotti() != null) {
+            dto.setIdBatch(t.getBatch_prodotti().getId());
+            dto.setIdLottoOrigine(t.getBatch_prodotti().getIdLottoOrigine());
+        }
         if (t.getScaffale_inizio() != null) dto.setIdScaffaleInizio(t.getScaffale_inizio().getId());
         if (t.getScaffale_fine() != null) dto.setIdScaffaleFine(t.getScaffale_fine().getId());
 
@@ -259,6 +275,19 @@ public class TaskService {
         
         // --- NOVITÀ: Se il task è completato, aggiorno lo scaffale fisico! ---
         if ("COMPLETATO".equals(nuovoStato) && taskAggiornato.getBatch_prodotti() != null) {
+            
+            // --- NOVITÀ FEFO e VENDITE ---
+            if ("PRELIEVO".equals(taskAggiornato.getTipo_task())) {
+                taskAggiornato.getBatch_prodotti().setStatoLotto("IN_ATTESA");
+                batchProdottiRepository.save(taskAggiornato.getBatch_prodotti());
+            } else if ("USCITA".equals(taskAggiornato.getTipo_task())) {
+                taskAggiornato.getBatch_prodotti().setStatoLotto("VENDUTO");
+                batchProdottiRepository.save(taskAggiornato.getBatch_prodotti());
+            } else if ("DEPOSITO".equals(taskAggiornato.getTipo_task())) {
+                taskAggiornato.getBatch_prodotti().setStatoLotto("IN_MAGAZZINO");
+                batchProdottiRepository.save(taskAggiornato.getBatch_prodotti());
+            }
+
             try {
                 // 1. Se era uno spostamento o prelievo da scaffale, rimuovo dalla vecchia cella
                 if (taskAggiornato.getScaffale_inizio() != null && taskAggiornato.getQta_spostata() > 0) {
@@ -314,7 +343,10 @@ public class TaskService {
                     taskAggiornato.getQta_spostata(),
                     "Non Assegnato"
             );
-            if (taskAggiornato.getBatch_prodotti() != null) responseDto.setIdBatch(taskAggiornato.getBatch_prodotti().getId());
+            if (taskAggiornato.getBatch_prodotti() != null) {
+                responseDto.setIdBatch(taskAggiornato.getBatch_prodotti().getId());
+                responseDto.setIdLottoOrigine(taskAggiornato.getBatch_prodotti().getIdLottoOrigine());
+            }
             if (taskAggiornato.getScaffale_inizio() != null) responseDto.setIdScaffaleInizio(taskAggiornato.getScaffale_inizio().getId());
             if (taskAggiornato.getScaffale_fine() != null) responseDto.setIdScaffaleFine(taskAggiornato.getScaffale_fine().getId());
             responseDto.setNuovaX(taskAggiornato.getNuova_x());

@@ -5,15 +5,17 @@ public class BatchProdottiDTO {
     private Long idProdotto;
     private Integer quantita;
     private String scadenza;
+    private Long idLottoOrigine;
 
     public BatchProdottiDTO() {
     }
 
-    public BatchProdottiDTO(Long id, Long idProdotto, Integer quantita, String scadenza) {
+    public BatchProdottiDTO(Long id, Long idProdotto, Integer quantita, String scadenza, Long idLottoOrigine) {
         this.id = id;
         this.idProdotto = idProdotto;
         this.quantita = quantita;
         this.scadenza = scadenza;
+        this.idLottoOrigine = idLottoOrigine;
     }
 
     // getters and setters
@@ -48,6 +50,14 @@ public class BatchProdottiDTO {
 
     public void setScadenza(String scadenza) {
         this.scadenza = scadenza;
+    }
+
+    public Long getIdLottoOrigine() {
+        return idLottoOrigine;
+    }
+
+    public void setIdLottoOrigine(Long idLottoOrigine) {
+        this.idLottoOrigine = idLottoOrigine;
     }
 }
 

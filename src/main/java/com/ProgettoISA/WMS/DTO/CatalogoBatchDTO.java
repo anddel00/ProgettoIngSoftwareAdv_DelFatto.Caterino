@@ -9,13 +9,17 @@ public class CatalogoBatchDTO {
     private Integer quantitaDisponibile;
     private LocalDate dataScadenza;
     private List<String> posizioni;
+    private Long idLottoOrigine;
+    private Long idOrdineVendita;
 
-    public CatalogoBatchDTO(Long idLotto, String nomeProdotto, Integer quantitaDisponibile, LocalDate dataScadenza, List<String> posizioni) {
+    public CatalogoBatchDTO(Long idLotto, String nomeProdotto, Integer quantitaDisponibile, LocalDate dataScadenza, List<String> posizioni, Long idLottoOrigine, Long idOrdineVendita) {
         this.idLotto = idLotto;
         this.nomeProdotto = nomeProdotto;
         this.quantitaDisponibile = quantitaDisponibile;
         this.dataScadenza = dataScadenza;
         this.posizioni = posizioni;
+        this.idLottoOrigine = idLottoOrigine;
+        this.idOrdineVendita = idOrdineVendita;
     }
 
     public Long getIdLotto() {
@@ -56,5 +60,21 @@ public class CatalogoBatchDTO {
 
     public void setPosizioni(List<String> posizioni) {
         this.posizioni = posizioni;
+    }
+
+    public Long getIdLottoOrigine() {
+        return idLottoOrigine;
+    }
+
+    public void setIdLottoOrigine(Long idLottoOrigine) {
+        this.idLottoOrigine = idLottoOrigine;
+    }
+
+    public Long getIdOrdineVendita() {
+        return idOrdineVendita;
+    }
+
+    public void setIdOrdineVendita(Long idOrdineVendita) {
+        this.idOrdineVendita = idOrdineVendita;
     }
 }

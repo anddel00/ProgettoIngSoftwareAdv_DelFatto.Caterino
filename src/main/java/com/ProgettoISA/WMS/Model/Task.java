@@ -25,6 +25,9 @@ public class Task {
     @Column(name = "\"TipoTask\"")
     private String tipo_task;
     
+    @Column(name = "\"IdMissione\"", nullable = true)
+    private String idMissione;
+    
     @ManyToOne
     @JoinColumn(name = "\"Id_Batch\"")
     private BatchProdotti batch_prodotti;
@@ -189,5 +192,13 @@ public class Task {
 
     public List<TaskDip> getTaskDip() {
         return taskDip;
+    }
+
+    public String getIdMissione() {
+        return idMissione;
+    }
+
+    public void setIdMissione(String idMissione) {
+        this.idMissione = idMissione;
     }
 }

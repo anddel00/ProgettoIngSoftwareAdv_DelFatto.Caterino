@@ -6,6 +6,7 @@ public class CreaTaskDTO {
     private String tipoTask;      // es. "PRELIEVO", "DEPOSITO", "SPOSTAMENTO"
     private int quantita;
     private String emailDipendente; // A quale dipendente assegnare il task
+    private String idMissione;
 
     private Long idBatch;
     private Long idScaffaleInizio;
@@ -33,6 +34,9 @@ public class CreaTaskDTO {
 
     public String getEmailDipendente() { return emailDipendente; }
     public void setEmailDipendente(String emailDipendente) { this.emailDipendente = emailDipendente; }
+
+    public String getIdMissione() { return idMissione; }
+    public void setIdMissione(String idMissione) { this.idMissione = idMissione; }
 
     public int getVecchiaX() { return vecchiaX; }
     public void setVecchiaX(int vecchiaX) { this.vecchiaX = vecchiaX; }

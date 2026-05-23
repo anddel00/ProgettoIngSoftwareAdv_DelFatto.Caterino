@@ -26,4 +26,7 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
            "WHERE td.dipendente.email = :email " +
            "AND t.stato_task IN ('DA_FARE', 'IN_CARICO')")
     Double sumCaricoAttivoInKgPerDipendente(@Param("email") String email);
+
+    @Query("SELECT t FROM Task t WHERE t.idMissione LIKE :missionePrefix%")
+    List<Task> findByIdMissioneStartingWith(@Param("missionePrefix") String missionePrefix);
 }

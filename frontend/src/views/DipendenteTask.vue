@@ -72,6 +72,59 @@ const taskCompletatiFiltrati = computed(() => {
   });
 })
 
+const missioniRaggruppate = computed(() => {
+  const result = {};
+  taskAttiviFiltrati.value.forEach(task => {
+    const key = task.idMissione || 'Task Singoli';
+    if (!result[key]) {
+      result[key] = [];
+    }
+    result[key].push(task);
+  });
+  return result;
+});
+
+const missioniRaggruppateCompletate = computed(() => {
+  const result = {};
+  taskCompletatiFiltrati.value.forEach(task => {
+    const key = task.idMissione || 'Task Singoli';
+    if (!result[key]) {
+      result[key] = [];
+    }
+    result[key].push(task);
+  });
+  return result;
+});
+
+const aggiornaStatoTask = async (task, nuovoStato) => {
+  try {
+    await api.patch(`/api/tasks/${task.id}/stato?nuovoStato=${nuovoStato}`)
+    // Aggiorniamo la UI localmente (il WS informerà l'Admin)
+    task.statoTask = nuovoStato
+  } catch (error) {
+    console.error("Errore durante l'aggiornamento dello stato:", error)
+    alert("Impossibile aggiornare lo stato del task. Riprova.")
+  }
+}
+
+// Bulk update per l'intera missione
+const aggiornaStatoMissione = async (tasks, nuovoStato) => {
+  try {
+    const tasksToUpdate = tasks.filter(t => t.statoTask !== nuovoStato && t.statoTask !== 'COMPLETATO');
+    await Promise.all(tasksToUpdate.map(t => api.patch(`/api/tasks/${t.id}/stato?nuovoStato=${nuovoStato}`)));
+    
+    tasksToUpdate.forEach(t => {
+      t.statoTask = nuovoStato;
+    });
+  } catch (error) {
+    console.error("Errore aggiornamento missione:", error);
+    alert("Impossibile aggiornare la missione. Riprova.");
+  }
+}
+
+const hasDaFare = (tasks) => tasks.some(t => t.statoTask === 'DA_FARE');
+const canComplete = (tasks) => tasks.some(t => t.statoTask === 'IN_CARICO') && tasks.every(t => t.statoTask !== 'DA_FARE');
+
 onMounted(() => {
   fetchTasks()
   connectWebSocket(emailUtente.value, ruoloUtente.value)
@@ -88,9 +141,9 @@ const getPercorso = (task) => {
   const inizio = labelScaffale(task.idScaffaleInizio, task.vecchiaY, task.vecchiaX, task.vecchiaZ)
   const fine   = labelScaffale(task.idScaffaleFine,   task.nuovaY,  task.nuovaX,  task.nuovaZ)
   if (task.tipoTask === 'SPOSTAMENTO') return { da: inizio || '—', a: fine || '—' }
-  if (task.tipoTask === 'PRELIEVO')    return { da: inizio || '—', a: 'In attesa' }
-  if (task.tipoTask === 'DEPOSITO')    return { da: 'In attesa', a: fine || '—' }
-  return { da: '—', a: '—' }
+  if (task.tipoTask === 'PRELIEVO' || task.tipoTask === 'USCITA') return { da: inizio || '—', a: 'Area Spedizione' }
+  if (task.tipoTask === 'DEPOSITO')    return { da: 'Area Ricezione', a: fine || '—' }
+  return { da: inizio || '—', a: fine || '—' }
 }
 </script>
 
@@ -160,19 +213,59 @@ const getPercorso = (task) => {
         </div>
 
         <div class="task-grid mb-8" v-if="taskAttiviFiltrati.length > 0">
-          <div v-for="task in taskAttiviFiltrati" :key="task.id" class="task-card" :class="task.statoTask === 'IN_CARICO' ? 'priority-high' : 'priority-normal'">
-            <div class="task-header">
-              <span class="task-type" :class="task.tipoTask === 'PRELIEVO' ? 'pickup' : 'dropoff'">{{ task.tipoTask }}</span>
-              <span class="task-id">#TSK-{{ task.id }}</span>
+          <div v-for="(tasks, idMissione) in missioniRaggruppate" :key="idMissione" class="mission-card">
+            <div class="mission-header">
+              <h3>{{ idMissione === 'Task Singoli' ? 'Task Singoli' : 'Missione: ' + idMissione }}</h3>
+              <span class="task-count">{{ tasks.length }} task</span>
             </div>
-            <h3 class="item-name">{{ task.descrizione }}</h3>
-            <div class="location-box">
-              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-              <span><strong>Da:</strong> {{ getPercorso(task).da }} &nbsp;➔&nbsp; <strong>A:</strong> {{ getPercorso(task).a }}</span>
+            
+            <div class="mission-tasks">
+              <div v-for="task in tasks" :key="task.id" class="task-inner-card" :class="task.statoTask === 'IN_CARICO' ? 'priority-high' : 'priority-normal'">
+                <div class="task-header">
+                  <span class="task-type" :class="task.tipoTask === 'PRELIEVO' ? 'pickup' : 'dropoff'">{{ task.tipoTask }}</span>
+                  <span class="task-id">#TSK-{{ task.id }}</span>
+                </div>
+                <h4 class="item-name">{{ task.descrizione }}</h4>
+                <div class="location-box">
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                  <span><strong>Da:</strong> {{ getPercorso(task).da }} &nbsp;➔&nbsp; <strong>A:</strong> {{ getPercorso(task).a }}</span>
+                </div>
+                <div class="qty-box">Quantità da spostare: <strong>{{ task.quantita }} unità</strong></div>
+                <div class="status-indicator mt-2 mb-4" :class="task.statoTask === 'IN_CARICO' ? 'text-blue' : 'text-gray'">
+                  Stato: <strong>{{ task.statoTask.replace('_', ' ') }}</strong>
+                </div>
+
+                <!-- Pulsanti singoli solo se NON è una missione accorpata -->
+                <template v-if="idMissione === 'Task Singoli'">
+                  <button v-if="task.statoTask === 'DA_FARE'"
+                          @click="aggiornaStatoTask(task, 'IN_CARICO')"
+                          class="btn-primary w-full mt-4">
+                    Prendi in Carico
+                  </button>
+
+                  <button v-if="task.statoTask === 'IN_CARICO'"
+                          @click="aggiornaStatoTask(task, 'COMPLETATO')"
+                          class="btn-success w-full mt-4">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width: 18px; display: inline; vertical-align: text-bottom;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                    Conferma Completamento
+                  </button>
+                </template>
+              </div>
             </div>
-            <div class="qty-box">Quantità: <strong>{{ task.quantita }} unità</strong></div>
-            <div class="status-indicator mt-4" :class="task.statoTask === 'IN_CARICO' ? 'text-blue' : 'text-gray'">
-              Stato: <strong>{{ task.statoTask.replace('_', ' ') }}</strong>
+
+            <!-- Pulsanti massivi per l'intera Missione -->
+            <div class="mission-actions" v-if="idMissione !== 'Task Singoli'" style="margin-top: 20px;">
+              <button v-if="hasDaFare(tasks)" 
+                      @click="aggiornaStatoMissione(tasks, 'IN_CARICO')" 
+                      class="btn-primary w-full">
+                Prendi Missione in Carico
+              </button>
+              <button v-else-if="canComplete(tasks)" 
+                      @click="aggiornaStatoMissione(tasks, 'COMPLETATO')" 
+                      class="btn-success w-full">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width: 18px; display: inline; vertical-align: text-bottom;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                Completa Intera Missione
+              </button>
             </div>
           </div>
         </div>
@@ -190,13 +283,22 @@ const getPercorso = (task) => {
         </div>
 
         <div class="task-grid" v-if="taskCompletatiFiltrati.length > 0">
-          <div v-for="task in taskCompletatiFiltrati" :key="task.id" class="task-card completed-card">
-            <div class="task-header">
-              <span class="badge-success">COMPLETATO</span>
-              <span class="task-id">#TSK-{{ task.id }}</span>
+          <div v-for="(tasks, idMissione) in missioniRaggruppateCompletate" :key="'comp-'+idMissione" class="mission-card completed-card">
+            <div class="mission-header">
+              <h3>{{ idMissione === 'Task Singoli' ? 'Task Singoli' : 'Missione: ' + idMissione }}</h3>
+              <span class="task-count completed-count">{{ tasks.length }} task</span>
             </div>
-            <h3 class="item-name">{{ task.descrizione }}</h3>
-            <div class="qty-box">Quantità spostata: <strong>{{ task.quantita }} unità</strong></div>
+            
+            <div class="mission-tasks">
+              <div v-for="task in tasks" :key="task.id" class="task-inner-card">
+                <div class="task-header">
+                  <span class="badge-success">COMPLETATO</span>
+                  <span class="task-id">#TSK-{{ task.id }}</span>
+                </div>
+                <h4 class="item-name" style="text-decoration: line-through; color: #64748b;">{{ task.descrizione }}</h4>
+                <div class="qty-box">Quantità spostata: <strong>{{ task.quantita }} unità</strong></div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -258,8 +360,23 @@ const getPercorso = (task) => {
 
 .text-blue { color: #2563eb; }
 .text-gray { color: #64748b; }
-.mt-4 { margin-top: 16px; }
 .mb-8 { margin-bottom: 32px; }
+
+/* Missioni e Task Innestati */
+.mission-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02); }
+.mission-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; }
+.mission-header h3 { margin: 0; font-size: 20px; color: #0f172a; font-weight: 700; }
+.mission-tasks { display: flex; flex-direction: column; gap: 16px; }
+.task-inner-card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; position: relative; overflow: hidden; box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.02); }
+.task-inner-card::before { content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; }
+.task-inner-card h4 { margin: 0 0 12px 0; font-size: 16px; color: #1e293b; }
+.mt-2 { margin-top: 8px; }
+.mb-4 { margin-bottom: 16px; }
+.w-full { width: 100%; }
+.btn-primary { background-color: #6366f1; color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; transition: all 0.2s; }
+.btn-primary:hover { background-color: #4f46e5; }
+.btn-success { background-color: #10b981; color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; transition: all 0.2s; }
+.btn-success:hover { background-color: #059669; }
 
 /* Stili specifici per i completati */
 .completed-card { background-color: #f8fafc; border-color: #e2e8f0; }
