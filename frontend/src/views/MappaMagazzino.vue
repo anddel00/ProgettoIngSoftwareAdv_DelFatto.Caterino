@@ -505,12 +505,13 @@ const gestisciClickCella = async (cella, slotIndex) => {
     );
 
     if (bsEsistente) {
+      const qtaPrima = bsEsistente.qta; // Cattura la quantità PRIMA dell'incremento
       bsEsistente.qta += quantitaSelezionata.value;
       const modEsistente = modifichePendenti.value.find(m => Number(m.id) === Number(bsEsistente.id));
       if (modEsistente) {
         modEsistente.qta = bsEsistente.qta;
       } else {
-        modifichePendenti.value.push({ ...bsEsistente });
+        modifichePendenti.value.push({ ...bsEsistente, originalQta: qtaPrima });
       }
     } else {
       const payload = {
@@ -560,11 +561,15 @@ const salvaAssegnamenti = async () => {
     // --- LOGICA SPOSTAMENTO ---
     // Costruiamo set di batch rimossi e batch inseriti per trovare gli SPOSTAMENTI
     // Un batch rimosso da uno scaffale e inserito in un altro = task SPOSTAMENTO unico
-    const batchRimossiMap = new Map(); // idBatch -> entry modifichePendenti
+    const batchRimossiMap = new Map(); // idBatch -> entry modifichePendenti (quantità DIMINUITA)
+    const batchAggiuntiMap = new Map(); // idBatch -> entry modifichePendenti (quantità AUMENTATA)
     for (const mp of modifichePendenti.value) {
       const differenza = mp.originalQta - mp.qta;
       if (differenza > 0) {
         batchRimossiMap.set(Number(mp.idBatchProdotti), { mp, differenza });
+      } else if (differenza < 0) {
+        // Quantità aggiunta a un record esistente → serve un task DEPOSITO
+        batchAggiuntiMap.set(Number(mp.idBatchProdotti), { mp, aggiunta: Math.abs(differenza) });
       }
     }
 
@@ -635,7 +640,45 @@ const salvaAssegnamenti = async () => {
       }
     }
 
-    // Seconda passata: prelievi rimasti (non abbinati a nessun inserimento = PRELIEVO puro)
+    // Seconda passata: abbina rimozioni con aggiunte su record esistenti → SPOSTAMENTO
+    for (const [idBatch, rimossoEntry] of [...batchRimossiMap.entries()]) {
+      const aggiuntoEntry = batchAggiuntiMap.get(idBatch);
+      if (aggiuntoEntry) {
+        const prodotto = getProdottoDaBatch(idBatch);
+        const lotto = tuttiIBatch.value.find(b => Number(b.id) === idBatch);
+        const qtaSpostamento = Math.min(rimossoEntry.differenza, aggiuntoEntry.aggiunta);
+
+        tasksDaCreare.push({
+          descrizione: `Spostamento: ${prodotto?.nome || 'Prodotto'} (Lotto #${lotto?.id}) → nuovo slot`,
+          tipoTask: 'SPOSTAMENTO',
+          quantita: qtaSpostamento,
+          idBatch: idBatch,
+          idScaffaleInizio: rimossoEntry.mp.idMappa,
+          vecchiaX: rimossoEntry.mp.colonna,
+          vecchiaY: rimossoEntry.mp.riga,
+          vecchiaZ: rimossoEntry.mp.altezza,
+          idScaffaleFine: aggiuntoEntry.mp.idMappa,
+          nuovaX: aggiuntoEntry.mp.colonna,
+          nuovaY: aggiuntoEntry.mp.riga,
+          nuovaZ: aggiuntoEntry.mp.altezza
+        });
+
+        // Aggiorna le quantità residue
+        if (rimossoEntry.differenza > qtaSpostamento) {
+          rimossoEntry.differenza -= qtaSpostamento;
+        } else {
+          batchRimossiMap.delete(idBatch);
+        }
+
+        if (aggiuntoEntry.aggiunta > qtaSpostamento) {
+          aggiuntoEntry.aggiunta -= qtaSpostamento;
+        } else {
+          batchAggiuntiMap.delete(idBatch);
+        }
+      }
+    }
+
+    // Terza passata: prelievi rimasti (non abbinati a nessun inserimento = PRELIEVO puro)
     for (const [idBatch, { mp, differenza }] of batchRimossiMap.entries()) {
       const prodotto = getProdottoDaBatch(idBatch);
       tasksDaCreare.push({
@@ -647,6 +690,22 @@ const salvaAssegnamenti = async () => {
         vecchiaX: mp.colonna,
         vecchiaY: mp.riga,
         vecchiaZ: mp.altezza
+      });
+    }
+
+    // Quarta passata: quantità aumentate residue su record esistenti (DEPOSITO puro)
+    for (const [idBatch, { mp, aggiunta }] of batchAggiuntiMap.entries()) {
+      const prodotto = getProdottoDaBatch(idBatch);
+      const lotto = tuttiIBatch.value.find(b => Number(b.id) === idBatch);
+      tasksDaCreare.push({
+        descrizione: `Sistemazione in ingresso: ${prodotto?.nome || 'Prodotto'} (Lotto #${lotto?.id})`,
+        tipoTask: 'DEPOSITO',
+        quantita: aggiunta,
+        idBatch: idBatch,
+        idScaffaleFine: mp.idMappa,
+        nuovaX: mp.colonna,
+        nuovaY: mp.riga,
+        nuovaZ: mp.altezza
       });
     }
     
