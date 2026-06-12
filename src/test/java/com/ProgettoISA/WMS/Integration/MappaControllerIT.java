@@ -14,6 +14,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.security.test.context.support.WithMockUser;
 
+import org.junit.jupiter.api.BeforeEach;
+import com.ProgettoISA.WMS.Model.Mappa;
+import com.ProgettoISA.WMS.Model.Reparti;
+import com.ProgettoISA.WMS.Model.Scaffali;
+import com.ProgettoISA.WMS.Repository.MappaRepository;
+import com.ProgettoISA.WMS.Repository.RepartiRepository;
+import com.ProgettoISA.WMS.Repository.ScaffaliRepository;
+
 @SpringBootTest
 @AutoConfigureMockMvc
 @WithMockUser(roles = "Admin")
@@ -23,6 +31,37 @@ public class MappaControllerIT {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private RepartiRepository repartiRepository;
+
+    @Autowired
+    private ScaffaliRepository scaffaliRepository;
+
+    @Autowired
+    private MappaRepository mappaRepository;
+
+    @BeforeEach
+    void setup() {
+        if (mappaRepository.findAll().isEmpty()) {
+            Reparti reparto = new Reparti();
+            reparto.setNome("Reparto Test");
+            reparto.setMaxX(10L);
+            reparto.setMaxY(10L);
+            reparto = repartiRepository.save(reparto);
+
+            Scaffali scaffale = new Scaffali(2, 2, 2, 500);
+            scaffale = scaffaliRepository.save(scaffale);
+
+            Mappa mappa = new Mappa();
+            mappa.setReparto(reparto);
+            mappa.setScaffale(scaffale);
+            mappa.setX(0);
+            mappa.setY(0);
+            mappa.setOrientamentoScaffale("ORIZZONTALE");
+            mappaRepository.save(mappa);
+        }
+    }
 
     @Test
     void caricaMappa_ritornaSuccessoEListaScaffali() throws Exception {
