@@ -8,6 +8,12 @@ import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
+import org.junit.jupiter.api.BeforeEach;
+import com.ProgettoISA.WMS.Model.Ruoli;
+import com.ProgettoISA.WMS.Model.Utenti;
+import com.ProgettoISA.WMS.Repository.RuoliRepository;
+import com.ProgettoISA.WMS.Service.UtentiService;
+import java.util.Date;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -20,6 +26,31 @@ public class LoginIT {
     // Questo è il nostro "finto browser" o "finto Axios" che fa le chiamate
     @Autowired
     private TestRestTemplate restTemplate;
+
+    @Autowired
+    private UtentiService utentiService;
+    
+    @Autowired
+    private RuoliRepository ruoliRepository;
+
+    @BeforeEach
+    void setup() {
+        try {
+            Ruoli adminRole = ruoliRepository.findByNomeRuolo("Admin")
+                    .orElseGet(() -> ruoliRepository.save(new Ruoli("Admin")));
+            
+            Utenti admin = new Utenti();
+            admin.setNome("Mario");
+            admin.setUsername("Admin");
+            admin.setCognome("Rossi");
+            admin.setData_nascita(new Date());
+            admin.setEmail("admin@wms.it");
+            admin.setPassword("admin123");
+            utentiService.registraUtente(admin, adminRole.getNomeRuolo());
+        } catch (Exception e) {
+            // L'utente potrebbe esistere già
+        }
+    }
 
     @Test
     void testLoginConCredenzialiCorrette() {

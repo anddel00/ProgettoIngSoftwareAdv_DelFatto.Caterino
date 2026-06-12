@@ -8,12 +8,14 @@ import java.time.LocalDate;
 import com.ProgettoISA.WMS.Model.*;
 import com.ProgettoISA.WMS.Repository.*;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.ProgettoISA.WMS.Service.UtentiService;
 
 @Component
+@Profile("!test")
 public class DatabaseTestRunner implements CommandLineRunner {
 
     private final RuoliRepository ruoliRepository;
