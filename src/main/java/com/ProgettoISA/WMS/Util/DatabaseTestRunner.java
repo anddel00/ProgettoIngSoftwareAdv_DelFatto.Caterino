@@ -9,6 +9,7 @@ import com.ProgettoISA.WMS.Model.*;
 import com.ProgettoISA.WMS.Repository.*;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.ProgettoISA.WMS.Service.UtentiService;
 
@@ -54,6 +55,7 @@ public class DatabaseTestRunner implements CommandLineRunner {
     }
 
     @Override
+    @Transactional
     public void run(String... args) {
         System.out.println("⏳ Inizializzazione dati database...");
 
@@ -151,69 +153,80 @@ public class DatabaseTestRunner implements CommandLineRunner {
                 List<Mappa> mappeSalvate = mappaRepository.saveAll(mappeDaSalvare);
                 System.out.println("✅ Mappa e Scaffali generati con corridoio dinamico!");
 
-                // =================================================================
-                // 🧪 STRESS TEST COMPLETO: GENERAZIONE DEI BATCH E ABBINAMENTO CELLE - Decommentare per riempire Reparti e Scaffali
-                // =================================================================
-//                System.out.println("🧪 Generazione lotti logici e fisici per lo Stress Test...");
-//                List<Prodotti> tuttiIProdotti = prodottiRepository.findAll();
-//
-//                if (!tuttiIProdotti.isEmpty()) {
-//                    List<BatchProdotti> lottiDaSalvare = new ArrayList<>();
-//                    LocalDate scadenzaFittizia = LocalDate.now().plusMonths(6);
-//                    int prodottoIndex = 0;
-//
-//                    // Fase A: Generiamo un'entità BatchProdotti per ogni singola coordinata spaziale (Righe x Colonne x Altezza)
-//                    for (Mappa mappa : mappeSalvate) {
-//                        Scaffali scaffale = mappa.getScaffale();
-//
-//                        for (int r = 0; r < scaffale.getMax_righe(); r++) {
-//                            for (int c = 0; c < scaffale.getMax_colonne(); c++) {
-//                                for (int h = 0; h < scaffale.getMax_altezza(); h++) {
-//                                    Prodotti pScelto = tuttiIProdotti.get(prodottoIndex % tuttiIProdotti.size());
-//                                    prodottoIndex++;
-//
-//                                    BatchProdotti bp = new BatchProdotti(pScelto, 100, scadenzaFittizia);
-//                                    lottiDaSalvare.add(bp);
-//                                }
-//                            }
-//                        }
-//                    }
-//
-//                    // Salviamo massivamente a DB per generare gli ID univoci stabili dei lotti logici
-//                    List<BatchProdotti> lottiSalvati = batchProdottiRepository.saveAll(lottiDaSalvare);
-//
-//                    // Fase B: Abbiniamo i lotti logici salvati alla griglia di giacenza fisica (BatchScaffale)
-//                    List<BatchScaffale> relazioniGiacenza = new ArrayList<>();
-//                    int lottoCounter = 0;
-//
-//                    for (Mappa mappa : mappeSalvate) {
-//                        Scaffali scaffale = mappa.getScaffale();
-//
-//                        // Controllo dell'orientamento per allinearci alla logica del Frontend
-//                        boolean isOrizzontale = mappa.getOrientamentoScaffale().equals("ORIZZONTALE");
-//
-//                        for (int r = 0; r < scaffale.getMax_righe(); r++) {
-//                            for (int c = 0; c < scaffale.getMax_colonne(); c++) {
-//                                for (int h = 0; h < scaffale.getMax_altezza(); h++) {
-//                                    BatchProdotti lottoCorrente = lottiSalvati.get(lottoCounter);
-//                                    lottoCounter++;
-//
-//                                    // IL TRUCCO: Invertiamo le coordinate se lo scaffale è orizzontale,
-//                                    // in modo che il frontend trovi i dati dove si aspetta!
-//                                    int colonnaEffettiva = isOrizzontale ? r : c;
-//                                    int rigaEffettiva = isOrizzontale ? c : r;
-//
-//                                    BatchScaffale bs = new BatchScaffale(mappa, lottoCorrente, colonnaEffettiva, rigaEffettiva, h, 100/lottoCorrente.getProdotto().getSpazioUnitario().intValue());
-//                                    relazioniGiacenza.add(bs);
-//                                }
-//                            }
-//                        }
-//                    }
-//
-//                    // Scrittura massiva finale ad alte prestazioni delle giacenze fisiche
-//                    batchScaffaleRepository.saveAll(relazioniGiacenza);
-//                    System.out.println("✅ STRESS TEST PRONTO: " + relazioniGiacenza.size() + " celle riempite al 100%!");
-//                }
+            }
+        }
+
+        // =================================================================
+        // 🧪 STRESS TEST COMPLETO: GENERAZIONE DEI BATCH E ABBINAMENTO CELLE
+        // =================================================================
+        if (batchScaffaleRepository.findAll().isEmpty()) {
+            System.out.println("🧪 Generazione lotti logici e fisici per lo Stress Test (solo Surgelati)...");
+            List<Prodotti> tuttiIProdotti = prodottiRepository.findAll();
+            List<Mappa> tutteLeMappe = mappaRepository.findAll();
+
+            if (!tuttiIProdotti.isEmpty() && !tutteLeMappe.isEmpty()) {
+                List<BatchProdotti> lottiDaSalvare = new ArrayList<>();
+                LocalDate scadenzaFittizia = LocalDate.now().plusMonths(6);
+                int prodottoIndex = 0;
+
+                List<Mappa> mappeDaRiempire = new ArrayList<>();
+                for (Mappa m : tutteLeMappe) {
+                    if (m.getReparto().getNome().equalsIgnoreCase("Surgelati")) {
+                        mappeDaRiempire.add(m);
+                    }
+                }
+
+                // Fase A: Generiamo un'entità BatchProdotti per ogni singola coordinata spaziale (Righe x Colonne x Altezza)
+                for (Mappa mappa : mappeDaRiempire) {
+                    Scaffali scaffale = mappa.getScaffale();
+
+                    for (int r = 0; r < scaffale.getMax_righe(); r++) {
+                        for (int c = 0; c < scaffale.getMax_colonne(); c++) {
+                            for (int h = 0; h < scaffale.getMax_altezza(); h++) {
+                                Prodotti pScelto = tuttiIProdotti.get(prodottoIndex % tuttiIProdotti.size());
+                                prodottoIndex++;
+
+                                BatchProdotti bp = new BatchProdotti(pScelto, 100, scadenzaFittizia);
+                                lottiDaSalvare.add(bp);
+                            }
+                        }
+                    }
+                }
+
+                // Salviamo massivamente a DB per generare gli ID univoci stabili dei lotti logici
+                List<BatchProdotti> lottiSalvati = batchProdottiRepository.saveAll(lottiDaSalvare);
+
+                // Fase B: Abbiniamo i lotti logici salvati alla griglia di giacenza fisica (BatchScaffale)
+                List<BatchScaffale> relazioniGiacenza = new ArrayList<>();
+                int lottoCounter = 0;
+
+                for (Mappa mappa : mappeDaRiempire) {
+                    Scaffali scaffale = mappa.getScaffale();
+
+                    // Controllo dell'orientamento per allinearci alla logica del Frontend
+                    boolean isOrizzontale = mappa.getOrientamentoScaffale().equals("ORIZZONTALE");
+
+                    for (int r = 0; r < scaffale.getMax_righe(); r++) {
+                        for (int c = 0; c < scaffale.getMax_colonne(); c++) {
+                            for (int h = 0; h < scaffale.getMax_altezza(); h++) {
+                                BatchProdotti lottoCorrente = lottiSalvati.get(lottoCounter);
+                                lottoCounter++;
+
+                                // IL TRUCCO: Invertiamo le coordinate se lo scaffale è orizzontale,
+                                // in modo che il frontend trovi i dati dove si aspetta!
+                                int colonnaEffettiva = isOrizzontale ? r : c;
+                                int rigaEffettiva = isOrizzontale ? c : r;
+
+                                BatchScaffale bs = new BatchScaffale(mappa, lottoCorrente, colonnaEffettiva, rigaEffettiva, h, 100/lottoCorrente.getProdotto().getSpazioUnitario().intValue());
+                                relazioniGiacenza.add(bs);
+                            }
+                        }
+                    }
+                }
+
+                // Scrittura massiva finale ad alte prestazioni delle giacenze fisiche
+                batchScaffaleRepository.saveAll(relazioniGiacenza);
+                System.out.println("✅ STRESS TEST PRONTO: " + relazioniGiacenza.size() + " celle riempite al 100% nel reparto Surgelati!");
             }
         }
 
@@ -245,6 +258,62 @@ public class DatabaseTestRunner implements CommandLineRunner {
             System.out.println("✅ Dipendente creato: andrea@wms.it / andrea123");
         } catch (Exception e) {
             System.out.println("ℹ️ Dipendente presente");
+        }
+
+        try {
+            Utenti dipendente2 = new Utenti();
+            dipendente2.setNome("Luigi");
+            dipendente2.setUsername("luigi");
+            dipendente2.setCognome("Verdi");
+            dipendente2.setData_nascita(new Date());
+            dipendente2.setEmail("luigi@wms.it");
+            dipendente2.setPassword("luigi123");
+            utentiService.registraUtente(dipendente2, "Dipendente");
+            System.out.println("✅ Dipendente creato: luigi@wms.it / luigi123");
+        } catch (Exception e) {
+            System.out.println("ℹ️ Dipendente luigi presente");
+        }
+
+        try {
+            Utenti dipendente3 = new Utenti();
+            dipendente3.setNome("Giulia");
+            dipendente3.setUsername("giulia");
+            dipendente3.setCognome("Bianchi");
+            dipendente3.setData_nascita(new Date());
+            dipendente3.setEmail("giulia@wms.it");
+            dipendente3.setPassword("giulia123");
+            utentiService.registraUtente(dipendente3, "Dipendente");
+            System.out.println("✅ Dipendente creato: giulia@wms.it / giulia123");
+        } catch (Exception e) {
+            System.out.println("ℹ️ Dipendente giulia presente");
+        }
+
+        try {
+            Utenti dipendente4 = new Utenti();
+            dipendente4.setNome("Marco");
+            dipendente4.setUsername("marco");
+            dipendente4.setCognome("Neri");
+            dipendente4.setData_nascita(new Date());
+            dipendente4.setEmail("marco@wms.it");
+            dipendente4.setPassword("marco123");
+            utentiService.registraUtente(dipendente4, "Dipendente");
+            System.out.println("✅ Dipendente creato: marco@wms.it / marco123");
+        } catch (Exception e) {
+            System.out.println("ℹ️ Dipendente marco presente");
+        }
+
+        try {
+            Utenti dipendente5 = new Utenti();
+            dipendente5.setNome("Sara");
+            dipendente5.setUsername("sara");
+            dipendente5.setCognome("Gialli");
+            dipendente5.setData_nascita(new Date());
+            dipendente5.setEmail("sara@wms.it");
+            dipendente5.setPassword("sara123");
+            utentiService.registraUtente(dipendente5, "Dipendente");
+            System.out.println("✅ Dipendente creato: sara@wms.it / sara123");
+        } catch (Exception e) {
+            System.out.println("ℹ️ Dipendente sara presente");
         }
     }
 }
